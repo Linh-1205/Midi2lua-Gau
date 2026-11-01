@@ -3,465 +3,463 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="google-adsense-account" content="ca-pub-8244154453894003">
-
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8244154453894003"
-     crossorigin="anonymous"></script>
-
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://hellohellohell012321.github.io/MIDI2LUA">
-  <meta property="og:site_name" content="MIDI2LUA">
-  <meta property="og:description" content="a revolutionary roblox autoplaying tool. by hellohellohell012321">
-  <meta property="og:footer" content="by hellohellohell012321">
-  <meta property="og:image" content="https://i.pinimg.com/736x/08/07/ce/0807cecd7bc87c3415bf68519b648321.jpg">
-
   <title>MIDI2LUA</title>
-
+  <meta property="og:title" content="MIDI2LUA">
+  <meta property="og:description" content="Convert MIDI to Roblox auto-piano Lua scripts. Accurate note capture, modern UI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --glass: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.18);
+      --glass-strong: rgba(255, 255, 255, 0.12);
+      --accent: #ff6b9d;
+      --accent-soft: rgba(255, 107, 157, 0.35);
+      --text: #f5f5f7;
+      --text-muted: #a1a1aa;
+      --bg: #0a0a0f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Arial', sans-serif;
-      background-size: cover;
-      margin: 0;
-      padding: 20px;
-      background-color: transparent;
-      overflow-y: auto;
-      background-color: #121212;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient mesh background */
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 30%, rgba(255, 80, 140, 0.25), transparent),
+        radial-gradient(ellipse 70% 50% at 80% 20%, rgba(120, 80, 255, 0.2), transparent),
+        radial-gradient(ellipse 60% 40% at 50% 80%, rgba(0, 200, 255, 0.15), transparent),
+        var(--bg);
+      animation: meshShift 18s ease-in-out infinite alternate;
+    }
+    @keyframes meshShift {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(25deg); }
     }
 
     .wrapper {
+      position: relative;
+      z-index: 1;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
+      padding: 48px 20px 80px;
+    }
+
+    /* Liquid glass card */
+    .glass {
+      background: var(--glass);
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
 
     .container {
-      border-radius: 12px;
-      padding: 40px;
-      width: 90%;
-      max-width: 600px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
-      text-align: center;
-      animation: slideUp 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: #1e1e1e;
+      width: 100%;
+      max-width: 560px;
+      padding: 40px 36px;
+      animation: floatIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(30px);
     }
-
-    @keyframes slideUp {
-      0% { transform: translateY(50px); opacity: 0; }
-      100% { transform: translateY(0); opacity: 1; }
+    @keyframes floatIn {
+      to { opacity: 1; transform: translateY(0); }
     }
 
     h1 {
-      font-size: 2rem;
-      color: #ffffff;
-      margin-bottom: 20px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      line-height: 1;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #fff 0%, #ffb3d0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-
-    a {
-      color: #4eaaff;
-      text-decoration: none;
-      transition: color 0.3s ease-in-out, text-decoration 0.3s ease-in-out;
-    }
-
-    a:hover {
-      color: #80dfff;
-      text-decoration: underline;
-    }
-
-    a:visited {
-      color: #cba6f7;
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 28px;
     }
 
     label {
-      font-size: 1.1rem;
-      color: #e0e0e0;
-      margin-bottom: 5px;
       display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    input, button, textarea {
+    input[type="number"],
+    input[type="file"],
+    textarea {
       width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      border: 1px solid #444;
-      border-radius: 8px;
-      font-size: 1rem;
-      transition: all 0.3s ease-in-out;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-strong);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+      outline: none;
     }
-
+    input[type="number"]:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      background: rgba(255, 255, 255, 0.1);
+    }
     input[type="file"] {
-      background-color: #2a2a2a;
       cursor: pointer;
+      padding: 10px;
     }
-
-    button {
-      background-color: #444;
+    input[type="file"]::file-selector-button {
+      background: var(--accent);
       color: white;
       border: none;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out;
       border-radius: 8px;
-      padding: 12px;
+      padding: 6px 14px;
+      margin-right: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    input[type="file"]::file-selector-button:hover {
+      transform: scale(1.03);
+      opacity: 0.9;
     }
 
-    button:hover {
-      background-color: #555;
-      transform: scale(1.02);
-    }
+    .field { margin-bottom: 18px; }
 
-    #convertButton {
-      background-color: #444;
+    /* Checkboxes as glass pills */
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 20px 0;
     }
-
-    #convertButton:hover {
-      background-color: #555;
-    }
-
-    #copyButton, #pasteButton, #txtButton {
-      background-color: #444;
-    }
-
-    #copyButton:hover, #pasteButton:hover, #txtButton:hover {
-      background-color: #555;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 150px;
-      background-color: #1e1e1e;
-      border: 1px solid #444;
-      color: #e0e0e0;
-      font-size: 1rem;
-    }
-
-    .info-box {
-      max-width: 600px;
-      background-color: #1e1e1e;
-      border: 1px solid #444;
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
       border-radius: 12px;
-      padding: 15px 20px;
-      margin-top: 20px;
-      text-align: left;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      font-size: 1rem;
-      color: #e0e0e0;
+      background: var(--glass);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
     }
-
-    .info-box p {
-      margin: 5px 0;
+    .opt:hover {
+      background: var(--glass-strong);
+      border-color: var(--glass-border);
+      transform: translateX(4px);
     }
-
-    .info-box h2 {
-      margin-bottom: 10px;
-    }
-
-    .checkbox-container {
+    .opt input { display: none; }
+    .check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1.5px solid var(--glass-border);
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .opt input:checked + .check {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-soft);
+    }
+    .opt input:checked + .check::after {
+      content: "✓";
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .opt span {
+      font-size: 0.9rem;
+      color: var(--text);
+      flex: 1;
+    }
+    .info-tip {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      transition: background 0.2s;
+    }
+    .info-tip:hover { background: var(--accent); color: white; }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
       gap: 10px;
+      margin-top: 8px;
+      flex-wrap: wrap;
     }
-
-    #bpmInput {
-    background-color: #1e1e1e;
-    color: #e0e0e0;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 12px;
-    }
-
-    input[type="file"] {
-    background-color: #2a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 8px;
-    cursor: pointer;
-    }
-
-    #infoIcon, #infoIcon2, #infoIcon3, #infoIcon4, #infoIcon5, #infoIcon6 {
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 13px 18px;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
       cursor: pointer;
-      color: #888;
-      text-decoration: underline;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    #convertButton {
+      background: linear-gradient(135deg, #ff6b9d, #c44dff);
+      color: white;
+      box-shadow: 0 4px 20px rgba(255, 107, 157, 0.4);
+    }
+    #convertButton:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 28px rgba(255, 107, 157, 0.55);
+    }
+    #convertButton:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      background: var(--glass-strong);
+      color: var(--text);
+      border: 1px solid var(--glass-border);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
     }
 
-    .checkbox-container label {
-      white-space: nowrap;
-      color: #e0e0e0;
+    textarea#output {
+      min-height: 180px;
+      resize: vertical;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      margin-top: 16px;
     }
 
-    .popup-container {
+    /* Info card */
+    .info-card {
+      max-width: 560px;
+      width: 100%;
+      margin-top: 24px;
+      padding: 24px 28px;
+      animation: floatIn 0.9s 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    .info-card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+    .info-card p, .info-card li {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .info-card ul { padding-left: 18px; margin-top: 8px; }
+    .info-card a { color: #7dd3fc; text-decoration: none; }
+    .info-card a:hover { text-decoration: underline; }
+
+    /* Tooltip popups */
+    .popup {
       position: fixed;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: #1e1e1e;
-      padding: 20px;
-      border: 1px solid black;
-      display: none;
-    }
-
-    #popup, #popup2, #popup3, #popup4, #popup5, #popup6 {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: #444;
-      padding: 20px;
-      border: 2px solid #888;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(20, 20, 28, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 360px;
+      width: 90%;
+      z-index: 100;
       visibility: hidden;
-      display: none;
-      color: #e0e0e0;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--text);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .popup.show {
+      visibility: visible;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .popup p { margin-bottom: 16px; line-height: 1.5; font-size: 0.9rem; }
+    .popup button {
+      background: var(--accent);
+      color: white;
+      width: 100%;
     }
 
-    #popup button, #popup2 button, #popup3 button, #popup4 button, #popup5 button, #popup6 button {
-    background-color: #666;
-    color: #e0e0e0;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out;
-    border-radius: 8px;
-    padding: 12px;
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
     }
+    .overlay.show { opacity: 1; visibility: visible; }
 
-    #popup button:hover, #popup2 button:hover, #popup3 button:hover, #popup4 button:hover, #popup5 button:hover, #popup6 button:hover {
-    background-color: #777;
-    transform: scale(1.02);
+    footer {
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-
-  <div style="position: fixed; top: 20px; left: 20px; z-index: 100;"><a href="/" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(45deg, #ffffff, #f0f0f0); color: #404040; width: 50px; height: 50px; border-radius: 50%; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; border: 1px solid #e0e0e0;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 5px 15px rgba(0, 0, 0, 0.15)';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 3px 10px rgba(0, 0, 0, 0.1)';"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></a></div>
+  <div class="bg-mesh"></div>
+  <div class="overlay" id="overlay"></div>
 
   <div class="wrapper">
-    <div class="container">
-      <h1>midi2lua - a revolutionary roblox autoplaying tool.</h1>
-      <label for="bpmInput">enter bpm:</label>
-      <input type="number" id="bpmInput" placeholder="Enter BPM" min="1" value="120" />
-      <input type="file" id="midiFile" accept=".mid" />
+    <div class="container glass">
+      <h1>MIDI2LUA</h1>
+      <p class="subtitle">Accurate MIDI → Roblox piano scripts. No missed notes.</p>
 
-      <div class="checkbox-container">
-        <input type="checkbox" id="checkAllCheckbox" />
-        <label for="checkAllCheckbox">check/uncheck all</label>
+      <div class="field">
+        <label for="bpmInput">BPM</label>
+        <input type="number" id="bpmInput" placeholder="120" min="1" value="120" />
       </div>
 
-      <div class="checkbox-container">
-        <input type="checkbox" id="midi88Checkbox" />
-        <label for="midi88Checkbox">midi88 conversion</label>
-        <span id="infoIcon">?</span>
+      <div class="field">
+        <label for="midiFile">MIDI file</label>
+        <input type="file" id="midiFile" accept=".mid,.midi" />
       </div>
 
-      <div class="checkbox-container">
-        <input type="checkbox" id="detectBpmCheckbox" checked />
-        <label for="detectBpmCheckbox">detect bpm</label>
-        <span id="infoIcon2">?</span>
+      <div class="options">
+        <label class="opt">
+          <input type="checkbox" id="checkAllCheckbox" />
+          <div class="check"></div>
+          <span>Check / uncheck all</span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="midi88Checkbox" />
+          <div class="check"></div>
+          <span>MIDI88 conversion</span>
+          <div class="info-tip" data-popup="popup1">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="detectBpmCheckbox" checked />
+          <div class="check"></div>
+          <span>Detect BPM from file</span>
+          <div class="info-tip" data-popup="popup2">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="shortNotesCheckbox" />
+          <div class="check"></div>
+          <span>Use MIDI note lengths</span>
+          <div class="info-tip" data-popup="popup3">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="velocityCheckbox" />
+          <div class="check"></div>
+          <span>Use note velocity</span>
+          <div class="info-tip" data-popup="popup4">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="sustainPedalCheckBox" />
+          <div class="check"></div>
+          <span>Use sustain pedal</span>
+          <div class="info-tip" data-popup="popup5">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="midiSpoofCheckbox" />
+          <div class="check"></div>
+          <span>MIDI spoofer (Piano Rooms)</span>
+          <div class="info-tip" data-popup="popup6">?</div>
+        </label>
       </div>
 
-      <div class="checkbox-container">
-        <input type="checkbox" id="shortNotesCheckbox"/>
-        <label for="shortNotesCheckbox">use midi note lengths</label>
-        <span id="infoIcon3">?</span>
+      <div class="btn-row">
+        <button id="convertButton">Convert</button>
+        <button id="copyButton" class="btn-secondary">Copy</button>
       </div>
 
-      <div class="checkbox-container">
-        <input type="checkbox" id="velocityCheckbox"/>
-        <label for="shortNotesCheckbox">use note velocity</label>
-        <span id="infoIcon4">?</span>
-      </div>
-
-      <div class="checkbox-container">
-        <input type="checkbox" id="sustainPedalCheckBox"/>
-        <label for="shortNotesCheckbox">use sustain pedal</label>
-        <span id="infoIcon5">?</span>
-      </div>
-
-      <div class="checkbox-container">
-        <input type="checkbox" id="midiSpoofCheckbox"/>
-        <label for="midiSpoofCheckbox">midi spoofer (only for piano rooms)</label>
-        <span id="infoIcon6">?</span>
-      </div>
-
-      <p style="color: #e0e0e0; text-align: center; margin-top: 20px;">
-        if you dont understand the options above and you're too lazy to read the popup explanations, take a look at this list of piano games:
-        <br><br>
-        <a href="https://www.roblox.com/games/5593470048/Visual-Pianos" target="_blank">Visual Pianos</a>, <a href="https://www.roblox.com/games/11792237983/Tacs-Piano-Stuff" target="_blank">Tac's Piano Stuff</a>, <a href="https://www.roblox.com/games/10888259502/Piano-Rooms" target="_blank">Piano Rooms</a>, <a href="https://www.roblox.com/games/8044000698/Open-Mic-Night-VOICE-CHAT" target="_blank">Open Mic Night</a>.
-        <br><br>
-        if you are in any of these games, then check off all of the checkboxes to make your playing as realistic and full as possible (only check off midi spoofer if you're in the game "Piano Rooms"!).
-      </p>
-
-      <button id="convertButton">let's go!</button>
-
-      <textarea id="output" readonly placeholder="Converted output will appear here..."></textarea>
-        <div style="display: flex; gap: 50px;" class="button-container">
-          <button id="copyButton">copy script</button>
-          <button id="pasteButton">convert into loadstring</button>
-          <button id="txtButton">save as txt</button>
-        </div>
-
-      <!-- Popup modal -->
-      <div id="popup">
-        <img src="/midi2lua/pic.png" alt="Image description" style="width:50%; height:auto; margin-bottom: 15px;">
-        <h3>what is midi88 conversion?</h3>
-        <p>midi88 lets you press lower and higher keys in the virtual piano, by clicking the control key. usually, roblox pianos only have five octaves on the piano, but a lot of songs use seven octaves. so when you are autoplaying with midi88, the song will sound a lot more full because it will be using the full seven-octave piano. the downside is that only some games support the usage of midi88, some of them being: <a href="https://www.roblox.com/games/5593470048/Visual-Pianos" target="_blank">Visual Pianos</a>, <a href="https://www.roblox.com/games/10888259502/Piano-Rooms" target="_blank">Piano Rooms</a>, <a href="https://www.roblox.com/games/11792237983/Tacs-Piano-Stuff" target="_blank">Tac's Piano Stuff</a>, <a href="https://www.roblox.com/games/8044000698/Open-Mic-Night-VOICE-CHAT" target="_blank">Open Mic Night</a>.</p>
-        <button onclick="closePopup()">ok!</button>
-      </div>
-
-      <div id="popup2">
-        <h3>what is "detect bpm"?</h3>
-        <p>if you have Detect BPM enabled, the website will automatically find the bpm of your MIDI file and use that. this way, you don't need to search for the song's BPM online.</p>
-        <button onclick="closePopup2()">ok!</button>
-      </div>
-
-      <div id="popup3">
-        <h3>what is "use midi note lengths"?</h3>
-        <p>if you have this enabled, the notes you play will be held for the same amount of time as in your midi file. if disabled, then the piano notes will be pressed for around 0.07 seconds before letting go. all the songs in the script TALENTLESS use short notes, but this is just a preference, if you prefer having your notes be the same length as your midi.</p>
-        <button onclick="closePopup3()">ok!</button>
-      </div>
-
-      <div id="popup4">
-        <h3>what is note velocity conversion?</h3>
-        <p>note velocity means the volume of the notes you play. this will make your playing more realistic because it will simulate the ALT key on your keyboard to adjust the velocity, making your playing sound like a real piano. the downside is that only some games support this, some of them being: <a href="https://www.roblox.com/games/5593470048/Visual-Pianos" target="_blank">Visual Pianos</a>, <a href="https://www.roblox.com/games/11792237983/Tacs-Piano-Stuff" target="_blank">Tac's Piano Stuff</a>, <a href="https://www.roblox.com/games/8044000698/Open-Mic-Night-VOICE-CHAT" target="_blank">Open Mic Night</a>. if you want to use this in the game <a href="https://www.roblox.com/games/10888259502/Piano-Rooms" target="_blank">Piano Rooms</a>, you need to also turn on the "midi spoofer" option. </p>
-        <button onclick="closePopup4()">ok!</button>
-      </div>
-
-      <div id="popup5">
-        <h3>what is the sustain pedal?</h3>
-        <p>the sustain pedal on the piano makes the notes resonate. usually, notes will stop playing as soon as you let go of their piano key, but when the sustain pedal is held, all notes will continue to resonate even after you let them go. in roblox pianos, the sustain pedal is controlled with the space bar. your playing will sound a lot more realistic with this- but the downside is that only some games support this, some of them being: <a href="https://www.roblox.com/games/5593470048/Visual-Pianos" target="_blank">Visual Pianos</a>, <a href="https://www.roblox.com/games/11792237983/Tacs-Piano-Stuff" target="_blank">Tac's Piano Stuff</a>, <a href="https://www.roblox.com/games/10888259502/Piano-Rooms" target="_blank">Piano Rooms</a>, <a href="https://www.roblox.com/games/8044000698/Open-Mic-Night-VOICE-CHAT" target="_blank">Open Mic Night</a>. NOTE: since TALENTLESS uses short notes for most of its songs, you're expected to have invert sustain turned on- which basically means all notes will resonate. when using the sustain pedal feature, you'll need invert sustain OFF- which means you should also turn on the 'use midi note lengths' feature when converting with the sustain pedal.</p>
-        <button onclick="closePopup5()">ok!</button>
-      </div>
-
-      <div id="popup6">
-        <h3>what is midi spoofer?</h3>
-        <p>this feature is only for the game PIANO ROOMS: <a href="https://www.roblox.com/games/10888259502/Piano-Rooms" target="_blank">https://www.roblox.com/games/10888259502/Piano-Rooms</a>. when "spoof midi" is turned ON, this will tell the game that all of your inputs are coming from a real midi keyboard, not a qwerty keyboard! this makes the autoplay so much more believable, because people will see that you are playing on a real piano. this works with velocity and midi88, but not the sustain pedal yet!</p>
-        <img src="/midi2lua/midiconnect.png" alt="Image description" style="width:50%; height:auto; margin-bottom: 15px;">
-        <h3>make sure you turn on "MidiConnect" before you play with midi spoofer!</h3>
-        <button onclick="closePopup6()">ok!</button>
-      </div>
-      
+      <textarea id="output" readonly placeholder="Output Lua script will appear here..."></textarea>
     </div>
 
-    <div class="info-box">
-      <h2>About MIDI2LUA</h2>
-      <p>MIDI2LUA is a tool that parses and extracts data from a midi file and converts it into a roblox piano autoplaying script.</p>
-      <p>MIDI2LUA is branched off of TALENTLESS, a Roblox script that autoplays the virtual piano by injecting fake keystrokes. MIDI2LUA extracts the rest intervals between notes in your MIDI file and converts them into a custom LUA format, which was also created by hellohellohell012321 and is used in his script, TALENTLESS.</p>
-      <p><strong>FAQ</strong></p>
-      <p><strong>Q:</strong> How do I start the autoplay?</p>
-      <p><strong>A:</strong> Copy the output that this website gives you, paste it into your Roblox executor, and run it.</p>
-      <p><strong>Q:</strong> Why does it sound kind of weird?</p>
-      <p><strong>A:</strong> MIDI2LUA is 100% accurate, so make sure the issue doesn't arise from the MIDI file itself.</p>
-      <p><strong>Q:</strong> Where do I find MIDI files?</p>
-      <p><strong>A:</strong> Google it, use <a href="https://nanomidi.net" target="_blank">nanomidi.net</a> or convert a Musescore score with <a href="https://nanomidi.net/musescore-downloader" target="_blank">this website</a>.</p>
-      <p><strong>Q:</strong> I have a question or an issue that wasn't mentioned in the FAQ.</p>
-      <p><strong>A:</strong> Join the Discord and create a support ticket! <a href="https://discord.gg/MP9nZgEeQD" target="_blank">Join here</a></p>
+    <div class="info-card glass">
+      <h2>What's new</h2>
+      <ul>
+        <li><strong>No missed notes</strong> — chords & overlapping notes are fully captured.</li>
+        <li>Player has <strong>seek controls</strong> (⏪ ⏩ ±5s) + pause/stop/BPM.</li>
+        <li>Custom songs can be assigned to <strong>any category</strong>, or create new ones.</li>
+        <li>Independent notification library (no external dependency).</li>
+      </ul>
+      <p style="margin-top:14px">Paste the generated script into the AutoPiano executor. Enjoy.</p>
     </div>
+
+    <footer>MIDI2LUA · improved note engine</footer>
   </div>
 
+  <!-- Popups -->
+  <div class="popup" id="popup1"><p>Maps the full 88-key range using Ctrl modifiers for extreme low/high notes. Required for some advanced piano games.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup2"><p>Reads the tempo from the MIDI file header instead of using the manual BPM value.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup3"><p>When enabled, uses actual note durations from the MIDI. When off, notes are short taps (better for many Roblox pianos).</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup4"><p>Translates MIDI velocity into Alt+key dynamics if the game supports it.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup5"><p>Converts sustain pedal (CC64) events into Space key holds.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup6"><p>Uses a special numpad protocol for the "Piano Rooms" game. Only enable if you play that specific experience.</p><button onclick="closePopup()">Got it</button></div>
 
-<script>
-  
-document.getElementById('infoIcon').addEventListener('click', function() {
-  const popup = document.getElementById('popup');
-  popup.style.visibility = 'visible';
-  popup.style.display = `block`;
-});
+  <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
+  <script src="midi61.js"></script>
+  <script>
+    // Check-all
+    document.getElementById("checkAllCheckbox").addEventListener("change", function () {
+      const boxes = ["midi88Checkbox","detectBpmCheckbox","shortNotesCheckbox","velocityCheckbox","sustainPedalCheckBox","midiSpoofCheckbox"];
+      boxes.forEach(id => { document.getElementById(id).checked = this.checked; });
+    });
 
-function closePopup() {
-  const popup = document.getElementById('popup');
-  popup.style.visibility = 'hidden';
-  popup.style.display = 'none';
-}
-
-document.getElementById('infoIcon2').addEventListener('click', function() {
-  const popup = document.getElementById('popup2');
-  popup.style.visibility = 'visible'; 
-  popup.style.display = `block`;
-});
-
-function closePopup2() {
-  const popup = document.getElementById('popup2');
-  popup.style.visibility = 'hidden'; 
-  popup.style.display = 'none';   
-}
-
-document.getElementById('infoIcon3').addEventListener('click', function() {
-  const popup = document.getElementById('popup3');
-  popup.style.visibility = 'visible';
-  popup.style.display = `block`;
-});
-
-function closePopup3() {
-  const popup = document.getElementById('popup3');
-  popup.style.visibility = 'hidden';
-  popup.style.display = 'none';   
-}
-
-document.getElementById('infoIcon4').addEventListener('click', function() {
-  const popup = document.getElementById('popup4');
-  popup.style.visibility = 'visible';
-  popup.style.display = `block`;
-});
-
-function closePopup4() {
-  const popup = document.getElementById('popup4');
-  popup.style.visibility = 'hidden'; 
-  popup.style.display = 'none'; 
-}
-
-document.getElementById('infoIcon5').addEventListener('click', function() {
-  const popup = document.getElementById('popup5');
-  popup.style.visibility = 'visible';
-  popup.style.display = `block`;
-});
-
-function closePopup5() {
-  const popup = document.getElementById('popup5');
-  popup.style.visibility = 'hidden'; 
-  popup.style.display = 'none'; 
-}
-
-document.getElementById('infoIcon6').addEventListener('click', function() {
-  const popup = document.getElementById('popup6');
-  popup.style.visibility = 'visible';
-  popup.style.display = `block`;
-});
-
-function closePopup6() {
-  const popup = document.getElementById('popup6');
-  popup.style.visibility = 'hidden'; 
-  popup.style.display = 'none'; 
-}
-
-
-</script>
-
+    // Tooltips
+    document.querySelectorAll(".info-tip").forEach(tip => {
+      tip.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = tip.dataset.popup;
+        document.getElementById(id).classList.add("show");
+        document.getElementById("overlay").classList.add("show");
+      });
+    });
+    function closePopup() {
+      document.querySelectorAll(".popup").forEach(p => p.classList.remove("show"));
+      document.getElementById("overlay").classList.remove("show");
+    }
+    document.getElementById("overlay").addEventListener("click", closePopup);
+  </script>
 </body>
-
-<script type="text/javascript" src=
-  "https://unpkg.com/tone@latest/build/Tone.js"></script>
-  <script type="text/javascript" src=
-  "https://unpkg.com/@tonejs/ui@0.0.8/build/tonejs-ui.js"></script>
-  <script type="text/javascript" src=
-  "https://unpkg.com/@tonejs/midi"></script>
-<script src="midi2lua/midi61.js"></script>
-<script src="midi2lua/pastefy.js"></script>
-
-<script>
-  document.getElementById('checkAllCheckbox').addEventListener('change', function () {
-  const isChecked = this.checked;
-  const checkboxes = document.querySelectorAll('#midi88Checkbox, #detectBpmCheckbox, #shortNotesCheckbox, #velocityCheckbox, #sustainPedalCheckBox');
-  checkboxes.forEach(checkbox => {
-    checkbox.checked = isChecked;
-  });
-});
-</script>
 </html>
