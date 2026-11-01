@@ -1,290 +1,144 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AutoPiano — MIDI → Lua Sheet</title>
-  <style>
-    :root {
-      --bg: #121218;
-      --card: #1c1c24;
-      --accent: #ff78a0;
-      --accent-dim: #ff78a055;
-      --text: #f0f0f5;
-      --muted: #9898a8;
-      --border: #2a2a36;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
-    }
-    .wrap {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 32px 20px 60px;
-    }
-    header {
-      margin-bottom: 28px;
-    }
-    header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    header h1 span { color: var(--accent); }
-    header p {
-      color: var(--muted);
-      margin-top: 6px;
-      font-size: 0.95rem;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 22px;
-      margin-bottom: 18px;
-    }
-    .drop {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 36px 20px;
-      text-align: center;
-      transition: border-color 0.15s, background 0.15s;
-      cursor: pointer;
-    }
-    .drop.dragover {
-      border-color: var(--accent);
-      background: var(--accent-dim);
-    }
-    .drop p { color: var(--muted); margin-top: 8px; font-size: 0.9rem; }
-    .drop strong { color: var(--accent); }
-    input[type="file"] { display: none; }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      align-items: flex-end;
-      margin-top: 16px;
-    }
-    label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    input[type="number"], select {
-      background: #2a2a34;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      width: 120px;
-    }
-    input[type="number"]:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 18px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: filter 0.12s;
-    }
-    button:hover { filter: brightness(1.08); }
-    button.secondary {
-      background: #2a2a36;
-      color: var(--text);
-    }
-    button:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-    textarea {
-      width: 100%;
-      min-height: 320px;
-      background: #16161e;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: #d8d8e4;
-      font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
-      font-size: 0.82rem;
-      padding: 14px;
-      resize: vertical;
-      line-height: 1.45;
-    }
-    textarea:focus { outline: none; border-color: var(--accent); }
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .status {
-      margin-top: 10px;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .status.ok { color: #6dca8e; }
-    .status.err { color: #e86a6a; }
-    footer {
-      margin-top: 28px;
-      color: var(--muted);
-      font-size: 0.8rem;
-      text-align: center;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoPiano MIDI to Sheet</title>
+<style>
+  :root {
+    --bg: #12121a; --panel: #1c1c28; --item: #262634; --text: #ebebf5; --muted: #9696ac;
+    --accent: #ffb6d0; --accent-text: #281820;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: var(--accent); }
+  p.sub { margin: 0 0 20px; color: var(--muted); }
+  .drop {
+    border: 1px dashed var(--accent); border-radius: 12px; padding: 28px; text-align: center;
+    background: var(--panel); cursor: pointer; transition: background .15s;
+  }
+  .drop.over { background: #2a2030; }
+  .drop strong { color: var(--accent); }
+  input[type=file] { display: none; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  label.f { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+  input[type=number] {
+    width: 110px; padding: 8px 10px; border-radius: 8px; border: 0; background: var(--panel);
+    color: var(--text); font: inherit;
+  }
+  label.chk { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+  button {
+    padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--item); color: var(--text);
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  textarea {
+    width: 100%; height: 320px; resize: vertical; border: 0; border-radius: 10px; padding: 12px;
+    background: var(--panel); color: var(--text); font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  }
+  #info { color: var(--muted); margin: 8px 0 12px; min-height: 21px; }
+  #info b { color: var(--text); }
+  .err { color: #ff7a8a !important; }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>AutoPiano <span>MIDI → Lua</span></h1>
-      <p>Convert a MIDI file into a sheet compatible with the AutoPiano engine (keypress / rest / finishedSong).</p>
-    </header>
+<main>
+  <h1>AutoPiano - MIDI to Sheet</h1>
+  <p class="sub">Tải file MIDI lên, nhận script Lua keypress / rest / finishedSong cho AutoPiano (Virtual Piano 61 phím, C2-C7).</p>
 
-    <div class="card">
-      <div class="drop" id="dropzone">
-        <div style="font-size: 2rem; opacity: 0.7;">♪</div>
-        <p><strong>Drop a .mid / .midi file</strong> or click to browse</p>
-        <p>Multi-track supported · chords merged by timestamp</p>
-      </div>
-      <input type="file" id="fileInput" accept=".mid,.midi,audio/midi,audio/x-midi" />
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".mid,.midi,audio/midi">
+    <div><strong>Chọn file MIDI</strong> hoặc kéo thả vào đây</div>
+    <div id="fname" style="color:var(--muted);margin-top:6px"></div>
+  </label>
 
-      <div class="row">
-        <label>
-          BPM
-          <input type="number" id="bpm" value="120" min="20" max="300" step="1" />
-        </label>
-        <label>
-          Note style
-          <select id="style">
-            <option value="short" selected>Short (x) — recommended</option>
-            <option value="beat">Beat duration</option>
-          </select>
-        </label>
-        <button type="button" id="convertBtn" disabled>Convert</button>
-      </div>
-      <div class="status" id="status">Waiting for file…</div>
-    </div>
-
-    <div class="card">
-      <label style="margin-bottom: 8px;">Output Lua sheet</label>
-      <textarea id="output" readonly placeholder="Converted script appears here…"></textarea>
-      <div class="toolbar">
-        <button type="button" id="copyBtn" class="secondary" disabled>Copy</button>
-        <button type="button" id="downloadBtn" class="secondary" disabled>Download .txt</button>
-      </div>
-    </div>
-
-    <footer>
-      Paste the output into AutoPiano → Add Song, or host as a sheet file.<br />
-      Layout: Virtual Piano 61-key QWERTY · AutoPiano engine compatible
-    </footer>
+  <div class="row">
+    <label class="f">BPM<input type="number" id="bpm" min="20" max="400" value="120"></label>
+    <label class="f">Transpose (nửa cung)<input type="number" id="transpose" min="-48" max="48" value="0"></label>
+    <label class="chk" style="align-self:flex-end"><input type="checkbox" id="fold" checked> Gập nốt ngoài dải vào C2-C7</label>
+    <label class="chk" style="align-self:flex-end"><input type="checkbox" id="hold"> Giữ nốt theo độ dài</label>
   </div>
 
-  <script src="midi61.js"></script>
-  <script>
-    const dropzone = document.getElementById("dropzone");
-    const fileInput = document.getElementById("fileInput");
-    const convertBtn = document.getElementById("convertBtn");
-    const copyBtn = document.getElementById("copyBtn");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const output = document.getElementById("output");
-    const status = document.getElementById("status");
-    const bpmInput = document.getElementById("bpm");
-    const styleSelect = document.getElementById("style");
+  <div class="row">
+    <button class="primary" id="convert" disabled>Convert</button>
+    <button id="copy" disabled>Copy</button>
+    <button id="download" disabled>Download .txt</button>
+  </div>
 
-    let currentBuffer = null;
-    let currentName = "song";
+  <div id="info"></div>
+  <textarea id="out" spellcheck="false" placeholder="Sheet sẽ hiện ở đây..."></textarea>
+</main>
 
-    function setStatus(msg, kind) {
-      status.textContent = msg;
-      status.className = "status" + (kind ? " " + kind : "");
+<script src="midi61.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let midi = null, fileName = "song";
+
+  function setInfo(html, isErr) {
+    $("info").innerHTML = html;
+    $("info").classList.toggle("err", !!isErr);
+  }
+
+  async function loadFile(f) {
+    if (!f) return;
+    try {
+      midi = Midi61.parseMidi(await f.arrayBuffer());
+      fileName = f.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "") || "song";
+      $("fname").textContent = f.name;
+      $("bpm").value = midi.firstBpm || 120;
+      $("convert").disabled = false;
+      setInfo("Đọc được <b>" + midi.notes.length + "</b> nốt, dài <b>" + midi.duration.toFixed(1) + "s</b>, tempo gốc <b>" + midi.firstBpm + "</b> BPM.");
+      convert();
+    } catch (e) {
+      midi = null;
+      $("convert").disabled = true;
+      setInfo("Không đọc được file: " + e.message, true);
     }
+  }
 
-    function loadFile(file) {
-      if (!file) return;
-      currentName = (file.name || "song").replace(/\.(mid|midi)$/i, "");
-      const reader = new FileReader();
-      reader.onload = () => {
-        currentBuffer = reader.result;
-        convertBtn.disabled = false;
-        setStatus("Loaded: " + file.name + " (" + Math.round(file.size / 1024) + " KB). Press Convert.", "ok");
-      };
-      reader.onerror = () => setStatus("Failed to read file.", "err");
-      reader.readAsArrayBuffer(file);
-    }
+  function convert() {
+    if (!midi) return;
+    const r = Midi61.midiToSheet(midi, {
+      bpm: $("bpm").value,
+      transpose: $("transpose").value,
+      fold: $("fold").checked,
+      hold: $("hold").checked,
+    });
+    $("out").value = r.sheet;
+    $("copy").disabled = $("download").disabled = false;
+    setInfo("<b>" + r.stats.groups + "</b> dòng keypress từ <b>" + r.stats.notes + "</b> nốt"
+      + " | BPM <b>" + r.bpm + "</b>"
+      + " | gập quãng tám: <b>" + r.stats.folded + "</b>"
+      + " | bỏ (ngoài dải): <b>" + r.stats.dropped + "</b>");
+  }
 
-    dropzone.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files[0]) loadFile(fileInput.files[0]);
-    });
+  $("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
 
-    ["dragenter", "dragover"].forEach((ev) => {
-      dropzone.addEventListener(ev, (e) => {
-        e.preventDefault();
-        dropzone.classList.add("dragover");
-      });
-    });
-    ["dragleave", "drop"].forEach((ev) => {
-      dropzone.addEventListener(ev, (e) => {
-        e.preventDefault();
-        dropzone.classList.remove("dragover");
-      });
-    });
-    dropzone.addEventListener("drop", (e) => {
-      const f = e.dataTransfer.files[0];
-      if (f) loadFile(f);
-    });
+  $("convert").addEventListener("click", convert);
+  ["bpm", "transpose", "fold", "hold"].forEach((id) => $(id).addEventListener("change", convert));
 
-    convertBtn.addEventListener("click", () => {
-      if (!currentBuffer) return;
-      try {
-        const bpm = Number(bpmInput.value) || 120;
-        const shortNote = styleSelect.value === "short";
-        const lua = window.Midi61.midiToLua(currentBuffer, { bpm, shortNote });
-        output.value = lua;
-        copyBtn.disabled = false;
-        downloadBtn.disabled = false;
-        const lines = lua.split("\n").length;
-        setStatus("Done — " + lines + " lines. Copy into Add Song or save as .txt.", "ok");
-      } catch (err) {
-        setStatus("Error: " + (err && err.message ? err.message : String(err)), "err");
-        output.value = "";
-        copyBtn.disabled = true;
-        downloadBtn.disabled = true;
-      }
-    });
+  $("copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("out").value); }
+    catch (e) { $("out").select(); document.execCommand("copy"); }
+    $("copy").textContent = "Copied";
+    setTimeout(() => ($("copy").textContent = "Copy"), 1200);
+  });
 
-    copyBtn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(output.value);
-        setStatus("Copied to clipboard.", "ok");
-      } catch {
-        output.select();
-        document.execCommand("copy");
-        setStatus("Copied (fallback).", "ok");
-      }
-    });
-
-    downloadBtn.addEventListener("click", () => {
-      const blob = new Blob([output.value], { type: "text/plain;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = currentName + ".txt";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-  </script>
+  $("download").addEventListener("click", () => {
+    const url = URL.createObjectURL(new Blob([$("out").value], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName + ".txt"; a.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
 </body>
 </html>

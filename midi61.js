@@ -1,238 +1,201 @@
-/**
- * midi61.js — MIDI → AutoPiano Lua sheet converter
- * Maps pitches to Virtual Piano 61-key QWERTY layout.
- * Output: keypress("...", x, bpm) / rest(beats, bpm) / finishedSong()
+/*
+ * midi61.js - MIDI -> AutoPiano sheet (Virtual Piano 61 keys, C2..C7)
+ * Không phụ thuộc thư viện ngoài. Dùng được cả trong trình duyệt lẫn Node.
+ *
+ *   const midi  = Midi61.parseMidi(arrayBuffer);
+ *   const out   = Midi61.midiToSheet(midi, { bpm: 120, transpose: 0, fold: true, hold: false });
+ *   out.sheet   -> chuỗi Lua: keypress(...) / rest(...) / finishedSong()
  */
-
-(function (global) {
+(function (root) {
   "use strict";
 
-  // Virtual Piano 61-key style mapping (approx C2–C7)
-  // White + black keys via shift symbols
-  // Layout rows: 1-0, q-p, a-l, z-m with shifts for sharps
-  const NOTE_TO_KEY = {
-    // Octave 1 (low)
-    36: "1", 37: "!", 38: "2", 39: "@", 40: "3", 41: "4", 42: "$", 43: "5", 44: "%", 45: "6", 46: "^", 47: "7",
-    // Octave 2
-    48: "8", 49: "*", 50: "9", 51: "(", 52: "0", 53: "q", 54: "Q", 55: "w", 56: "W", 57: "e", 58: "E", 59: "r",
-    // Octave 3
-    60: "t", 61: "T", 62: "y", 63: "Y", 64: "u", 65: "i", 66: "I", 67: "o", 68: "O", 69: "p", 70: "P", 71: "a",
-    // Octave 4
-    72: "s", 73: "S", 74: "d", 75: "D", 76: "f", 77: "g", 78: "G", 79: "h", 80: "H", 81: "j", 82: "J", 83: "k",
-    // Octave 5
-    84: "l", 85: "L", 86: "z", 87: "Z", 88: "x", 89: "c", 90: "C", 91: "v", 92: "V", 93: "b", 94: "B", 95: "n",
-    // Octave 6
-    96: "m",
-  };
+  const WHITE = "1234567890qwertyuiopasdfghjklzxcvbnm"; // 36 phím trắng: C2..C7
+  const SHIFT_SYMS = "!@#$%^&*()";
+  const WHITE_DEGREE = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 };
+  const LOW = 36; // C2
+  const HIGH = 96; // C7
 
-  // Clamp / nearest fallback
-  function pitchToKey(midiNote) {
-    if (NOTE_TO_KEY[midiNote]) return NOTE_TO_KEY[midiNote];
-    // nearest in range
-    let best = 60;
-    let bestDist = 999;
-    for (const n of Object.keys(NOTE_TO_KEY)) {
-      const d = Math.abs(Number(n) - midiNote);
-      if (d < bestDist) {
-        bestDist = d;
-        best = Number(n);
-      }
+  // midi note (C4 = 60) -> ký tự Virtual Piano, null nếu ngoài C2..C7
+  function midiToKey(m) {
+    if (m < LOW || m > HIGH) return null;
+    const oct = Math.floor(m / 12) - 1;
+    let pc = m % 12;
+    let sharp = false;
+    if (WHITE_DEGREE[pc] === undefined) {
+      pc -= 1;
+      sharp = true;
     }
-    return NOTE_TO_KEY[best] || "t";
+    const idx = (oct - 2) * 7 + WHITE_DEGREE[pc];
+    let ch = WHITE[idx];
+    if (!ch) return null;
+    if (sharp) {
+      if (ch >= "0" && ch <= "9") ch = SHIFT_SYMS[ch === "0" ? 9 : Number(ch) - 1];
+      else ch = ch.toUpperCase();
+    }
+    return ch;
   }
 
-  /**
-   * Parse standard MIDI file (ArrayBuffer) → array of { time, type, note, velocity }
-   * time in ticks
-   */
+  // Đưa nốt về trong dải 61 phím bằng cách dịch cả quãng tám
+  function fitToRange(m, fold) {
+    if (!fold) return m >= LOW && m <= HIGH ? m : null;
+    while (m < LOW) m += 12;
+    while (m > HIGH) m -= 12;
+    return m;
+  }
+
+  // ---------------------------------------------------------------- parser
   function parseMidi(buffer) {
-    const view = new DataView(buffer);
-    let offset = 0;
+    const data = new Uint8Array(buffer);
+    let p = 0;
+    const u8 = () => data[p++];
+    const u16 = () => (data[p++] << 8) | data[p++];
+    const u32 = () => ((data[p++] << 24) | (data[p++] << 16) | (data[p++] << 8) | data[p++]) >>> 0;
+    const str = (n) => { let s = ""; for (let i = 0; i < n; i++) s += String.fromCharCode(data[p++]); return s; };
+    const vlq = () => {
+      let v = 0, b;
+      do { b = u8(); v = (v << 7) | (b & 0x7f); } while (b & 0x80);
+      return v >>> 0;
+    };
 
-    function readStr(n) {
-      let s = "";
-      for (let i = 0; i < n; i++) s += String.fromCharCode(view.getUint8(offset++));
-      return s;
-    }
-    function readU32() {
-      const v = view.getUint32(offset);
-      offset += 4;
-      return v;
-    }
-    function readU16() {
-      const v = view.getUint16(offset);
-      offset += 2;
-      return v;
-    }
-    function readU8() {
-      return view.getUint8(offset++);
-    }
-    function readVarLen() {
-      let v = 0;
-      while (true) {
-        const b = readU8();
-        v = (v << 7) | (b & 0x7f);
-        if ((b & 0x80) === 0) break;
-      }
-      return v;
-    }
+    if (str(4) !== "MThd") throw new Error("Không phải file MIDI (thiếu MThd)");
+    const hdrLen = u32();
+    const format = u16();
+    const ntrks = u16();
+    const division = u16();
+    p += hdrLen - 6;
+    if (division & 0x8000) throw new Error("MIDI dùng SMPTE time code - chưa hỗ trợ");
 
-    if (readStr(4) !== "MThd") throw new Error("Not a MIDI file (missing MThd)");
-    const headerLen = readU32();
-    const format = readU16();
-    const nTracks = readU16();
-    const division = readU16(); // ticks per quarter if high bit clear
-    offset += headerLen - 6; // skip rest of header if any
+    const notes = []; // { tick, endTick, pitch, vel }
+    const tempos = []; // { tick, usPerBeat }
 
-    const ticksPerQuarter = division & 0x8000 ? 480 : division;
-    const events = [];
+    for (let t = 0; t < ntrks; t++) {
+      if (p >= data.length) break;
+      const id = str(4);
+      const len = u32();
+      const end = p + len;
+      if (id !== "MTrk") { p = end; continue; }
 
-    for (let t = 0; t < nTracks; t++) {
-      if (offset + 8 > view.byteLength) break;
-      if (readStr(4) !== "MTrk") {
-        // try recover
-        offset -= 3;
-        continue;
-      }
-      const trackLen = readU32();
-      const trackEnd = offset + trackLen;
-      let tick = 0;
-      let runningStatus = 0;
+      let tick = 0, running = 0;
+      const active = {}; // "ch:pitch" -> [note,...]
+      while (p < end) {
+        tick += vlq();
+        let status = data[p];
+        if (status & 0x80) { p++; if (status < 0xf0) running = status; }
+        else status = running;
 
-      while (offset < trackEnd && offset < view.byteLength) {
-        const delta = readVarLen();
-        tick += delta;
-        let status = view.getUint8(offset);
-        if (status < 0x80) {
-          status = runningStatus;
-        } else {
-          offset++;
-          runningStatus = status;
-        }
-        const type = status & 0xf0;
-        const channel = status & 0x0f;
-
-        if (type === 0x90 || type === 0x80) {
-          const note = readU8();
-          const vel = readU8();
-          const isOn = type === 0x90 && vel > 0;
-          events.push({
-            tick,
-            type: isOn ? "on" : "off",
-            note,
-            velocity: vel,
-            channel,
-          });
-        } else if (type === 0xa0 || type === 0xb0 || type === 0xe0) {
-          offset += 2;
-        } else if (type === 0xc0 || type === 0xd0) {
-          offset += 1;
-        } else if (status === 0xff) {
-          const meta = readU8();
-          const len = readVarLen();
-          offset += len;
+        if (status === 0xff) {
+          const type = u8();
+          const mlen = vlq();
+          if (type === 0x51 && mlen === 3) tempos.push({ tick, usPerBeat: (data[p] << 16) | (data[p + 1] << 8) | data[p + 2] });
+          p += mlen;
         } else if (status === 0xf0 || status === 0xf7) {
-          const len = readVarLen();
-          offset += len;
+          p += vlq();
         } else {
-          // unknown – skip 1
-          break;
+          const kind = status & 0xf0, ch = status & 0x0f;
+          if (kind === 0xc0 || kind === 0xd0) { p += 1; continue; }
+          const a = u8(), b = u8();
+          const key = ch + ":" + a;
+          if (kind === 0x90 && b > 0) {
+            if (ch === 9) continue; // kênh 10 = drum, bỏ qua
+            const n = { tick, endTick: null, pitch: a, vel: b };
+            (active[key] = active[key] || []).push(n);
+            notes.push(n);
+          } else if (kind === 0x80 || (kind === 0x90 && b === 0)) {
+            const list = active[key];
+            if (list && list.length) list.shift().endTick = tick;
+          }
         }
       }
-      offset = trackEnd;
+      for (const k in active) for (const n of active[k]) if (n.endTick === null) n.endTick = n.tick;
+      p = end;
     }
 
-    events.sort((a, b) => a.tick - b.tick || (a.type === "on" ? -1 : 1));
-    return { events, ticksPerQuarter };
+    tempos.sort((a, b) => a.tick - b.tick);
+    if (!tempos.length || tempos[0].tick > 0) tempos.unshift({ tick: 0, usPerBeat: 500000 });
+
+    // tick -> giây theo tempo map
+    const segs = [];
+    let sec = 0;
+    for (let i = 0; i < tempos.length; i++) {
+      segs.push({ tick: tempos[i].tick, sec, usPerBeat: tempos[i].usPerBeat });
+      const next = tempos[i + 1];
+      if (next) sec += ((next.tick - tempos[i].tick) / division) * (tempos[i].usPerBeat / 1e6);
+    }
+    function tickToSec(tk) {
+      let s = segs[0];
+      for (let i = segs.length - 1; i >= 0; i--) if (segs[i].tick <= tk) { s = segs[i]; break; }
+      return s.sec + ((tk - s.tick) / division) * (s.usPerBeat / 1e6);
+    }
+
+    for (const n of notes) {
+      n.start = tickToSec(n.tick);
+      n.end = tickToSec(n.endTick);
+    }
+    notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+
+    const firstBpm = Math.round(60e6 / tempos[0].usPerBeat);
+    const duration = notes.reduce((m, n) => Math.max(m, n.end), 0);
+    return { format, division, notes, tempos, firstBpm, duration };
   }
 
-  /**
-   * Convert parsed MIDI → Lua sheet string
-   * @param {ArrayBuffer} buffer
-   * @param {{ bpm?: number, shortNote?: boolean }} opts
-   */
-  function midiToLua(buffer, opts) {
+  // ---------------------------------------------------------------- sheet
+  function midiToSheet(midi, opts) {
     opts = opts || {};
-    const bpm = opts.bpm || 120;
-    const useShort = opts.shortNote !== false; // default short notes (x)
+    const bpm = Number(opts.bpm) > 0 ? Number(opts.bpm) : midi.firstBpm || 120;
+    const transpose = Number(opts.transpose) || 0;
+    const fold = opts.fold !== false;
+    const hold = !!opts.hold;
+    const EPS = 0.001; // nốt cách nhau <1ms coi là cùng timestamp (chord)
+    const fmt = (v) => String(Math.round(v * 10000) / 10000);
 
-    const { events, ticksPerQuarter } = parseMidi(buffer);
-
-    // Group note-ons by tick → chords
-    const byTick = new Map();
-    for (const ev of events) {
-      if (ev.type !== "on") continue;
-      if (!byTick.has(ev.tick)) byTick.set(ev.tick, []);
-      byTick.get(ev.tick).push(ev.note);
-    }
-
-    const ticks = Array.from(byTick.keys()).sort((a, b) => a - b);
-    if (ticks.length === 0) {
-      return "-- empty MIDI\nfinishedSong()\n";
+    // gom theo timestamp
+    const groups = [];
+    let dropped = 0, folded = 0;
+    for (const n of midi.notes) {
+      let m = n.pitch + transpose;
+      const fitted = fitToRange(m, fold);
+      if (fitted === null) { dropped++; continue; }
+      if (fitted !== m) folded++;
+      const key = midiToKey(fitted);
+      const last = groups[groups.length - 1];
+      const beatLen = ((n.end - n.start) * bpm) / 60;
+      if (last && Math.abs(n.start - last.start) < EPS) {
+        if (!last.keys.includes(key)) { last.keys.push(key); last.beats = Math.max(last.beats, beatLen); }
+      } else {
+        groups.push({ start: n.start, keys: [key], beats: beatLen });
+      }
     }
 
     const lines = [];
-    lines.push("-- AutoPiano sheet generated from MIDI");
-    lines.push("-- BPM hint: " + bpm);
-    lines.push("");
-
-    let prevTick = ticks[0];
-
-    // optional lead-in rest if first note not at 0
-    if (prevTick > 0) {
-      const beats = prevTick / ticksPerQuarter;
-      if (beats > 0.01) {
-        lines.push(`rest(${roundBeats(beats)}, bpm)`);
-      }
+    let prevBeat = 0; // vị trí đã làm tròn của dòng trước
+    for (const g of groups) {
+      const absBeat = Math.round(((g.start * bpm) / 60) * 10000) / 10000;
+      const gap = Math.round((absBeat - prevBeat) * 10000) / 10000;
+      if (gap > 0) lines.push("rest(" + fmt(gap) + ", bpm)");
+      prevBeat = absBeat;
+      const keys = g.keys.join("").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const len = hold ? fmt(Math.max(g.beats, 0.05)) : "x";
+      lines.push('keypress("' + keys + '", ' + len + ", bpm)");
     }
-
-    for (let i = 0; i < ticks.length; i++) {
-      const tick = ticks[i];
-      const notes = byTick.get(tick);
-      // unique + sorted
-      const unique = [...new Set(notes)].sort((a, b) => a - b);
-      const keys = unique.map(pitchToKey).join("");
-
-      if (useShort) {
-        lines.push(`keypress("${escapeKeys(keys)}", x, bpm)`);
-      } else {
-        // estimate duration from next event or 0.5 beat
-        let durBeats = 0.5;
-        if (i + 1 < ticks.length) {
-          durBeats = Math.max(0.05, (ticks[i + 1] - tick) / ticksPerQuarter * 0.85);
-        }
-        lines.push(`keypress("${escapeKeys(keys)}", ${roundBeats(durBeats)}, bpm)`);
-      }
-
-      // rest until next note-on group
-      if (i + 1 < ticks.length) {
-        const deltaTicks = ticks[i + 1] - tick;
-        const beats = deltaTicks / ticksPerQuarter;
-        if (beats > 0.01) {
-          lines.push(`rest(${roundBeats(beats)}, bpm)`);
-        }
-      }
-    }
-
-    lines.push("");
+    // chờ hết nốt cuối rồi mới finish
+    const endBeat = Math.round(((midi.duration * bpm) / 60) * 10000) / 10000;
+    if (endBeat > prevBeat) lines.push("rest(" + fmt(endBeat - prevBeat) + ", bpm)");
     lines.push("finishedSong()");
-    return lines.join("\n");
+
+    return {
+      sheet: lines.join("\n"),
+      bpm,
+      stats: {
+        notes: midi.notes.length,
+        groups: groups.length,
+        dropped,
+        folded,
+        seconds: midi.duration,
+      },
+    };
   }
 
-  function roundBeats(b) {
-    // keep up to 3 decimals, strip trailing zeros
-    const r = Math.round(b * 1000) / 1000;
-    return String(r);
-  }
-
-  function escapeKeys(s) {
-    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  }
-
-  global.Midi61 = {
-    parseMidi,
-    midiToLua,
-    pitchToKey,
-    NOTE_TO_KEY,
-  };
-})(typeof window !== "undefined" ? window : globalThis);
+  const api = { parseMidi, midiToSheet, midiToKey };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.Midi61 = api;
+})(typeof window !== "undefined" ? window : this);
