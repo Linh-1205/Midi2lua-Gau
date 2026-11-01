@@ -2,464 +2,289 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MIDI2LUA</title>
-  <meta property="og:title" content="MIDI2LUA">
-  <meta property="og:description" content="Convert MIDI to Roblox auto-piano Lua scripts. Accurate note capture, modern UI.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoPiano — MIDI → Lua Sheet</title>
   <style>
     :root {
-      --glass: rgba(255, 255, 255, 0.08);
-      --glass-border: rgba(255, 255, 255, 0.18);
-      --glass-strong: rgba(255, 255, 255, 0.12);
-      --accent: #ff6b9d;
-      --accent-soft: rgba(255, 107, 157, 0.35);
-      --text: #f5f5f7;
-      --text-muted: #a1a1aa;
-      --bg: #0a0a0f;
+      --bg: #121218;
+      --card: #1c1c24;
+      --accent: #ff78a0;
+      --accent-dim: #ff78a055;
+      --text: #f0f0f5;
+      --muted: #9898a8;
+      --border: #2a2a36;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      overflow-x: hidden;
+      line-height: 1.5;
     }
-
-    /* Animated gradient mesh background */
-    .bg-mesh {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 20% 30%, rgba(255, 80, 140, 0.25), transparent),
-        radial-gradient(ellipse 70% 50% at 80% 20%, rgba(120, 80, 255, 0.2), transparent),
-        radial-gradient(ellipse 60% 40% at 50% 80%, rgba(0, 200, 255, 0.15), transparent),
-        var(--bg);
-      animation: meshShift 18s ease-in-out infinite alternate;
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
     }
-    @keyframes meshShift {
-      0% { filter: hue-rotate(0deg); }
-      100% { filter: hue-rotate(25deg); }
-    }
-
-    .wrapper {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 48px 20px 80px;
-    }
-
-    /* Liquid glass card */
-    .glass {
-      background: var(--glass);
-      backdrop-filter: blur(24px) saturate(1.4);
-      -webkit-backdrop-filter: blur(24px) saturate(1.4);
-      border: 1px solid var(--glass-border);
-      border-radius: 24px;
-      box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    }
-
-    .container {
-      width: 100%;
-      max-width: 560px;
-      padding: 40px 36px;
-      animation: floatIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    @keyframes floatIn {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      margin-bottom: 6px;
-      background: linear-gradient(135deg, #fff 0%, #ffb3d0 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .subtitle {
-      color: var(--text-muted);
-      font-size: 0.9rem;
+    header {
       margin-bottom: 28px;
     }
-
-    label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    input[type="number"],
-    input[type="file"],
-    textarea {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--glass-border);
-      background: var(--glass-strong);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.95rem;
-      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
-      outline: none;
-    }
-    input[type="number"]:focus,
-    textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
-      background: rgba(255, 255, 255, 0.1);
-    }
-    input[type="file"] {
-      cursor: pointer;
-      padding: 10px;
-    }
-    input[type="file"]::file-selector-button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 14px;
-      margin-right: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, opacity 0.2s;
-    }
-    input[type="file"]::file-selector-button:hover {
-      transform: scale(1.03);
-      opacity: 0.9;
-    }
-
-    .field { margin-bottom: 18px; }
-
-    /* Checkboxes as glass pills */
-    .options {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin: 20px 0;
-    }
-    .opt {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: var(--glass);
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
-    }
-    .opt:hover {
-      background: var(--glass-strong);
-      border-color: var(--glass-border);
-      transform: translateX(4px);
-    }
-    .opt input { display: none; }
-    .check {
-      width: 20px;
-      height: 20px;
-      border-radius: 6px;
-      border: 1.5px solid var(--glass-border);
-      background: transparent;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-    .opt input:checked + .check {
-      background: var(--accent);
-      border-color: var(--accent);
-      box-shadow: 0 0 12px var(--accent-soft);
-    }
-    .opt input:checked + .check::after {
-      content: "✓";
-      color: white;
-      font-size: 12px;
+    header h1 {
+      font-size: 1.75rem;
       font-weight: 700;
+      letter-spacing: -0.02em;
     }
-    .opt span {
-      font-size: 0.9rem;
-      color: var(--text);
-      flex: 1;
-    }
-    .info-tip {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      color: var(--text-muted);
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: help;
-      transition: background 0.2s;
-    }
-    .info-tip:hover { background: var(--accent); color: white; }
-
-    /* Buttons */
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 8px;
-      flex-wrap: wrap;
-    }
-    button {
-      flex: 1;
-      min-width: 120px;
-      padding: 13px 18px;
-      border: none;
-      border-radius: 12px;
-      font-family: inherit;
+    header h1 span { color: var(--accent); }
+    header p {
+      color: var(--muted);
+      margin-top: 6px;
       font-size: 0.95rem;
-      font-weight: 600;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+    .drop {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-      overflow: hidden;
     }
-    #convertButton {
-      background: linear-gradient(135deg, #ff6b9d, #c44dff);
-      color: white;
-      box-shadow: 0 4px 20px rgba(255, 107, 157, 0.4);
+    .drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
     }
-    #convertButton:hover {
-      transform: translateY(-2px) scale(1.02);
-      box-shadow: 0 8px 28px rgba(255, 107, 157, 0.55);
-    }
-    #convertButton:active { transform: scale(0.98); }
-
-    .btn-secondary {
-      background: var(--glass-strong);
-      color: var(--text);
-      border: 1px solid var(--glass-border);
-    }
-    .btn-secondary:hover {
-      background: rgba(255,255,255,0.15);
-      transform: translateY(-1px);
-    }
-
-    textarea#output {
-      min-height: 180px;
-      resize: vertical;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.8rem;
-      line-height: 1.5;
+    .drop p { color: var(--muted); margin-top: 8px; font-size: 0.9rem; }
+    .drop strong { color: var(--accent); }
+    input[type="file"] { display: none; }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
       margin-top: 16px;
     }
-
-    /* Info card */
-    .info-card {
-      max-width: 560px;
-      width: 100%;
-      margin-top: 24px;
-      padding: 24px 28px;
-      animation: floatIn 0.9s 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      opacity: 0;
-      transform: translateY(30px);
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
     }
-    .info-card h2 {
-      font-size: 1.1rem;
-      margin-bottom: 12px;
-      color: var(--accent);
-    }
-    .info-card p, .info-card li {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .info-card ul { padding-left: 18px; margin-top: 8px; }
-    .info-card a { color: #7dd3fc; text-decoration: none; }
-    .info-card a:hover { text-decoration: underline; }
-
-    /* Tooltip popups */
-    .popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.9);
-      background: rgba(20, 20, 28, 0.95);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 28px;
-      max-width: 360px;
-      width: 90%;
-      z-index: 100;
-      visibility: hidden;
-      opacity: 0;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    input[type="number"], select {
+      background: #2a2a34;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       color: var(--text);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      width: 120px;
     }
-    .popup.show {
-      visibility: visible;
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+    input[type="number"]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
     }
-    .popup p { margin-bottom: 16px; line-height: 1.5; font-size: 0.9rem; }
-    .popup button {
+    button {
       background: var(--accent);
-      color: white;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.12s;
+    }
+    button:hover { filter: brightness(1.08); }
+    button.secondary {
+      background: #2a2a36;
+      color: var(--text);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    textarea {
       width: 100%;
+      min-height: 320px;
+      background: #16161e;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: #d8d8e4;
+      font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+      font-size: 0.82rem;
+      padding: 14px;
+      resize: vertical;
+      line-height: 1.45;
     }
-
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 99;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s;
+    textarea:focus { outline: none; border-color: var(--accent); }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
     }
-    .overlay.show { opacity: 1; visibility: visible; }
-
+    .status {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .status.ok { color: #6dca8e; }
+    .status.err { color: #e86a6a; }
     footer {
-      margin-top: 40px;
-      color: var(--text-muted);
+      margin-top: 28px;
+      color: var(--muted);
       font-size: 0.8rem;
       text-align: center;
     }
   </style>
 </head>
 <body>
-  <div class="bg-mesh"></div>
-  <div class="overlay" id="overlay"></div>
+  <div class="wrap">
+    <header>
+      <h1>AutoPiano <span>MIDI → Lua</span></h1>
+      <p>Convert a MIDI file into a sheet compatible with the AutoPiano engine (keypress / rest / finishedSong).</p>
+    </header>
 
-  <div class="wrapper">
-    <div class="container glass">
-      <h1>MIDI2LUA</h1>
-      <p class="subtitle">Accurate MIDI → Roblox piano scripts. No missed notes.</p>
-
-      <div class="field">
-        <label for="bpmInput">BPM</label>
-        <input type="number" id="bpmInput" placeholder="120" min="1" value="120" />
+    <div class="card">
+      <div class="drop" id="dropzone">
+        <div style="font-size: 2rem; opacity: 0.7;">♪</div>
+        <p><strong>Drop a .mid / .midi file</strong> or click to browse</p>
+        <p>Multi-track supported · chords merged by timestamp</p>
       </div>
+      <input type="file" id="fileInput" accept=".mid,.midi,audio/midi,audio/x-midi" />
 
-      <div class="field">
-        <label for="midiFile">MIDI file</label>
-        <input type="file" id="midiFile" accept=".mid,.midi" />
+      <div class="row">
+        <label>
+          BPM
+          <input type="number" id="bpm" value="120" min="20" max="300" step="1" />
+        </label>
+        <label>
+          Note style
+          <select id="style">
+            <option value="short" selected>Short (x) — recommended</option>
+            <option value="beat">Beat duration</option>
+          </select>
+        </label>
+        <button type="button" id="convertBtn" disabled>Convert</button>
       </div>
-
-      <div class="options">
-        <label class="opt">
-          <input type="checkbox" id="checkAllCheckbox" />
-          <div class="check"></div>
-          <span>Check / uncheck all</span>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="midi88Checkbox" />
-          <div class="check"></div>
-          <span>MIDI88 conversion</span>
-          <div class="info-tip" data-popup="popup1">?</div>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="detectBpmCheckbox" checked />
-          <div class="check"></div>
-          <span>Detect BPM from file</span>
-          <div class="info-tip" data-popup="popup2">?</div>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="shortNotesCheckbox" />
-          <div class="check"></div>
-          <span>Use MIDI note lengths</span>
-          <div class="info-tip" data-popup="popup3">?</div>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="velocityCheckbox" />
-          <div class="check"></div>
-          <span>Use note velocity</span>
-          <div class="info-tip" data-popup="popup4">?</div>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="sustainPedalCheckBox" />
-          <div class="check"></div>
-          <span>Use sustain pedal</span>
-          <div class="info-tip" data-popup="popup5">?</div>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="midiSpoofCheckbox" />
-          <div class="check"></div>
-          <span>MIDI spoofer (Piano Rooms)</span>
-          <div class="info-tip" data-popup="popup6">?</div>
-        </label>
-      </div>
-
-      <div class="btn-row">
-        <button id="convertButton">Convert</button>
-        <button id="copyButton" class="btn-secondary">Copy</button>
-      </div>
-
-      <textarea id="output" readonly placeholder="Output Lua script will appear here..."></textarea>
+      <div class="status" id="status">Waiting for file…</div>
     </div>
 
-    <div class="info-card glass">
-      <h2>What's new</h2>
-      <ul>
-        <li><strong>No missed notes</strong> — chords & overlapping notes are fully captured.</li>
-        <li>Player has <strong>seek controls</strong> (⏪ ⏩ ±5s) + pause/stop/BPM.</li>
-        <li>Custom songs can be assigned to <strong>any category</strong>, or create new ones.</li>
-        <li>Independent notification library (no external dependency).</li>
-      </ul>
-      <p style="margin-top:14px">Paste the generated script into the AutoPiano executor. Enjoy.</p>
+    <div class="card">
+      <label style="margin-bottom: 8px;">Output Lua sheet</label>
+      <textarea id="output" readonly placeholder="Converted script appears here…"></textarea>
+      <div class="toolbar">
+        <button type="button" id="copyBtn" class="secondary" disabled>Copy</button>
+        <button type="button" id="downloadBtn" class="secondary" disabled>Download .txt</button>
+      </div>
     </div>
 
-    <footer>MIDI2LUA · improved note engine</footer>
+    <footer>
+      Paste the output into AutoPiano → Add Song, or host as a sheet file.<br />
+      Layout: Virtual Piano 61-key QWERTY · AutoPiano engine compatible
+    </footer>
   </div>
 
-  <!-- Popups -->
-  <div class="popup" id="popup1"><p>Maps the full 88-key range using Ctrl modifiers for extreme low/high notes. Required for some advanced piano games.</p><button onclick="closePopup()">Got it</button></div>
-  <div class="popup" id="popup2"><p>Reads the tempo from the MIDI file header instead of using the manual BPM value.</p><button onclick="closePopup()">Got it</button></div>
-  <div class="popup" id="popup3"><p>When enabled, uses actual note durations from the MIDI. When off, notes are short taps (better for many Roblox pianos).</p><button onclick="closePopup()">Got it</button></div>
-  <div class="popup" id="popup4"><p>Translates MIDI velocity into Alt+key dynamics if the game supports it.</p><button onclick="closePopup()">Got it</button></div>
-  <div class="popup" id="popup5"><p>Converts sustain pedal (CC64) events into Space key holds.</p><button onclick="closePopup()">Got it</button></div>
-  <div class="popup" id="popup6"><p>Uses a special numpad protocol for the "Piano Rooms" game. Only enable if you play that specific experience.</p><button onclick="closePopup()">Got it</button></div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
   <script src="midi61.js"></script>
   <script>
-    // Check-all
-    document.getElementById("checkAllCheckbox").addEventListener("change", function () {
-      const boxes = ["midi88Checkbox","detectBpmCheckbox","shortNotesCheckbox","velocityCheckbox","sustainPedalCheckBox","midiSpoofCheckbox"];
-      boxes.forEach(id => { document.getElementById(id).checked = this.checked; });
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const convertBtn = document.getElementById("convertBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const output = document.getElementById("output");
+    const status = document.getElementById("status");
+    const bpmInput = document.getElementById("bpm");
+    const styleSelect = document.getElementById("style");
+
+    let currentBuffer = null;
+    let currentName = "song";
+
+    function setStatus(msg, kind) {
+      status.textContent = msg;
+      status.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function loadFile(file) {
+      if (!file) return;
+      currentName = (file.name || "song").replace(/\.(mid|midi)$/i, "");
+      const reader = new FileReader();
+      reader.onload = () => {
+        currentBuffer = reader.result;
+        convertBtn.disabled = false;
+        setStatus("Loaded: " + file.name + " (" + Math.round(file.size / 1024) + " KB). Press Convert.", "ok");
+      };
+      reader.onerror = () => setStatus("Failed to read file.", "err");
+      reader.readAsArrayBuffer(file);
+    }
+
+    dropzone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) loadFile(fileInput.files[0]);
     });
 
-    // Tooltips
-    document.querySelectorAll(".info-tip").forEach(tip => {
-      tip.addEventListener("click", e => {
+    ["dragenter", "dragover"].forEach((ev) => {
+      dropzone.addEventListener(ev, (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        const id = tip.dataset.popup;
-        document.getElementById(id).classList.add("show");
-        document.getElementById("overlay").classList.add("show");
+        dropzone.classList.add("dragover");
       });
     });
-    function closePopup() {
-      document.querySelectorAll(".popup").forEach(p => p.classList.remove("show"));
-      document.getElementById("overlay").classList.remove("show");
-    }
-    document.getElementById("overlay").addEventListener("click", closePopup);
+    ["dragleave", "drop"].forEach((ev) => {
+      dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+    });
+    dropzone.addEventListener("drop", (e) => {
+      const f = e.dataTransfer.files[0];
+      if (f) loadFile(f);
+    });
+
+    convertBtn.addEventListener("click", () => {
+      if (!currentBuffer) return;
+      try {
+        const bpm = Number(bpmInput.value) || 120;
+        const shortNote = styleSelect.value === "short";
+        const lua = window.Midi61.midiToLua(currentBuffer, { bpm, shortNote });
+        output.value = lua;
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+        const lines = lua.split("\n").length;
+        setStatus("Done — " + lines + " lines. Copy into Add Song or save as .txt.", "ok");
+      } catch (err) {
+        setStatus("Error: " + (err && err.message ? err.message : String(err)), "err");
+        output.value = "";
+        copyBtn.disabled = true;
+        downloadBtn.disabled = true;
+      }
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(output.value);
+        setStatus("Copied to clipboard.", "ok");
+      } catch {
+        output.select();
+        document.execCommand("copy");
+        setStatus("Copied (fallback).", "ok");
+      }
+    });
+
+    downloadBtn.addEventListener("click", () => {
+      const blob = new Blob([output.value], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = currentName + ".txt";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
   </script>
 </body>
 </html>

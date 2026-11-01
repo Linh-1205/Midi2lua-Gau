@@ -1,209 +1,238 @@
-document.getElementById("convertButton").addEventListener("click", async () => {
-    console.log("Button click detected");
-    const fileInput = document.getElementById("midiFile");
-    const outputText = document.getElementById("output");
+/**
+ * midi61.js — MIDI → AutoPiano Lua sheet converter
+ * Maps pitches to Virtual Piano 61-key QWERTY layout.
+ * Output: keypress("...", x, bpm) / rest(beats, bpm) / finishedSong()
+ */
 
-    outputText.value = "converting...";
+(function (global) {
+  "use strict";
 
-    if (!fileInput.files.length) {
-        alert("Please upload a MIDI file.");
-        return;
+  // Virtual Piano 61-key style mapping (approx C2–C7)
+  // White + black keys via shift symbols
+  // Layout rows: 1-0, q-p, a-l, z-m with shifts for sharps
+  const NOTE_TO_KEY = {
+    // Octave 1 (low)
+    36: "1", 37: "!", 38: "2", 39: "@", 40: "3", 41: "4", 42: "$", 43: "5", 44: "%", 45: "6", 46: "^", 47: "7",
+    // Octave 2
+    48: "8", 49: "*", 50: "9", 51: "(", 52: "0", 53: "q", 54: "Q", 55: "w", 56: "W", 57: "e", 58: "E", 59: "r",
+    // Octave 3
+    60: "t", 61: "T", 62: "y", 63: "Y", 64: "u", 65: "i", 66: "I", 67: "o", 68: "O", 69: "p", 70: "P", 71: "a",
+    // Octave 4
+    72: "s", 73: "S", 74: "d", 75: "D", 76: "f", 77: "g", 78: "G", 79: "h", 80: "H", 81: "j", 82: "J", 83: "k",
+    // Octave 5
+    84: "l", 85: "L", 86: "z", 87: "Z", 88: "x", 89: "c", 90: "C", 91: "v", 92: "V", 93: "b", 94: "B", 95: "n",
+    // Octave 6
+    96: "m",
+  };
+
+  // Clamp / nearest fallback
+  function pitchToKey(midiNote) {
+    if (NOTE_TO_KEY[midiNote]) return NOTE_TO_KEY[midiNote];
+    // nearest in range
+    let best = 60;
+    let bestDist = 999;
+    for (const n of Object.keys(NOTE_TO_KEY)) {
+      const d = Math.abs(Number(n) - midiNote);
+      if (d < bestDist) {
+        bestDist = d;
+        best = Number(n);
+      }
+    }
+    return NOTE_TO_KEY[best] || "t";
+  }
+
+  /**
+   * Parse standard MIDI file (ArrayBuffer) → array of { time, type, note, velocity }
+   * time in ticks
+   */
+  function parseMidi(buffer) {
+    const view = new DataView(buffer);
+    let offset = 0;
+
+    function readStr(n) {
+      let s = "";
+      for (let i = 0; i < n; i++) s += String.fromCharCode(view.getUint8(offset++));
+      return s;
+    }
+    function readU32() {
+      const v = view.getUint32(offset);
+      offset += 4;
+      return v;
+    }
+    function readU16() {
+      const v = view.getUint16(offset);
+      offset += 2;
+      return v;
+    }
+    function readU8() {
+      return view.getUint8(offset++);
+    }
+    function readVarLen() {
+      let v = 0;
+      while (true) {
+        const b = readU8();
+        v = (v << 7) | (b & 0x7f);
+        if ((b & 0x80) === 0) break;
+      }
+      return v;
     }
 
-    let bpmInput = document.getElementById("bpmInput").value;
+    if (readStr(4) !== "MThd") throw new Error("Not a MIDI file (missing MThd)");
+    const headerLen = readU32();
+    const format = readU16();
+    const nTracks = readU16();
+    const division = readU16(); // ticks per quarter if high bit clear
+    offset += headerLen - 6; // skip rest of header if any
 
-    let noteMap = {};
+    const ticksPerQuarter = division & 0x8000 ? 480 : division;
+    const events = [];
 
-    if (!document.getElementById("midi88Checkbox").checked) {
-        noteMap = {
-            "A0": "1", "A#0": "2", "Bb0": "2", "B0": "3",
-            "C1": "1", "C#1": "!", "Db1": "!", "D1": "2", "D#1": "@", "Eb1": "@", "E1": "3", "F1": "4", "F#1": "$", "Gb1": "$", "G1": "5", "G#1": "%", "Ab1": "%", "A1": "6", "A#1": "^", "Bb1": "^", "B1": "7",
-            "C2": "1", "C#2": "!", "Db2": "!", "D2": "2", "D#2": "@", "Eb2": "@", "E2": "3", "F2": "4", "F#2": "$", "Gb2": "$", "G2": "5", "G#2": "%", "Ab2": "%", "A2": "6", "A#2": "^", "Bb2": "^", "B2": "7",
-            "C3": "8", "C#3": "*", "Db3": "*", "D3": "9", "D#3": "(", "Eb3": "(", "E3": "0", "F3": "q", "F#3": "Q", "Gb3": "Q", "G3": "w", "G#3": "W", "Ab3": "W", "A3": "e", "A#3": "E", "Bb3": "E", "B3": "r",
-            "C4": "t", "C#4": "T", "Db4": "T", "D4": "y", "D#4": "Y", "Eb4": "Y", "E4": "u", "F4": "i", "F#4": "I", "Gb4": "I", "G4": "o", "G#4": "O", "Ab4": "O", "A4": "p", "A#4": "P", "Bb4": "P", "B4": "a",
-            "C5": "s", "C#5": "S", "Db5": "S", "D5": "d", "D#5": "D", "Eb5": "D", "E5": "f", "F5": "g", "F#5": "G", "Gb5": "G", "G5": "h", "G#5": "H", "Ab5": "H", "A5": "j", "A#5": "J", "Bb5": "J", "B5": "k",
-            "C6": "l", "C#6": "L", "Db6": "L", "D6": "z", "D#6": "Z", "Eb6": "Z", "E6": "x", "F6": "c", "F#6": "C", "Gb6": "C", "G6": "v", "G#6": "V", "Ab6": "V", "A6": "b", "A#6": "B", "Bb6": "B", "B6": "n",
-            "C7": "m", "C#7": "L", "Db7": "L", "D7": "z", "D#7": "Z", "Eb7": "Z", "E7": "x", "F7": "c", "F#7": "C", "Gb7": "C", "G7": "v", "G#7": "V", "Ab7": "V", "A7": "b", "A#7": "B", "Bb7": "B", "B7": "n",
-            "C8": "j"
-        };
-    } else {
-        noteMap = {
-            "A0": "Ctrl+1", "A#0": "Ctrl+2", "Bb0": "Ctrl+2", "B0": "Ctrl+3",
-            "C1": "Ctrl+4", "C#1": "Ctrl+5", "Db1": "Ctrl+5", "D1": "Ctrl+6", "D#1": "Ctrl+7", "Eb1": "Ctrl+7", "E1": "Ctrl+8", "F1": "Ctrl+9", "F#1": "Ctrl+0", "Gb1": "Ctrl+0", "G1": "Ctrl+q", "G#1": "Ctrl+w", "Ab1": "Ctrl+w", "A1": "Ctrl+e", "A#1": "Ctrl+r", "Bb1": "Ctrl+r", "B1": "Ctrl+t",
-            "C2": "1", "C#2": "!", "Db2": "!", "D2": "2", "D#2": "@", "Eb2": "@", "E2": "3", "F2": "4", "F#2": "$", "Gb2": "$", "G2": "5", "G#2": "%", "Ab2": "%", "A2": "6", "A#2": "^", "Bb2": "^", "B2": "7",
-            "C3": "8", "C#3": "*", "Db3": "*", "D3": "9", "D#3": "(", "Eb3": "(", "E3": "0", "F3": "q", "F#3": "Q", "Gb3": "Q", "G3": "w", "G#3": "W", "Ab3": "W", "A3": "e", "A#3": "E", "Bb3": "E", "B3": "r",
-            "C4": "t", "C#4": "T", "Db4": "T", "D4": "y", "D#4": "Y", "Eb4": "Y", "E4": "u", "F4": "i", "F#4": "I", "Gb4": "I", "G4": "o", "G#4": "O", "Ab4": "O", "A4": "p", "A#4": "P", "Bb4": "P", "B4": "a",
-            "C5": "s", "C#5": "S", "Db5": "S", "D5": "d", "D#5": "D", "Eb5": "D", "E5": "f", "F5": "g", "F#5": "G", "Gb5": "G", "G5": "h", "G#5": "H", "Ab5": "H", "A5": "j", "A#5": "J", "Bb5": "J", "B5": "k",
-            "C6": "l", "C#6": "L", "Db6": "L", "D6": "z", "D#6": "Z", "Eb6": "Z", "E6": "x", "F6": "c", "F#6": "C", "Gb6": "C", "G6": "v", "G#6": "V", "Ab6": "V", "A6": "b", "A#6": "B", "Bb6": "B", "B6": "n",
-            "C7": "m", "C#7": "M", "Db7": "M", "D7": "Ctrl+u", "D#7": "Ctrl+i", "Eb7": "Ctrl+i", "E7": "Ctrl+o", "F7": "Ctrl+p", "F#7": "Ctrl+a", "Gb7": "Ctrl+a", "G7": "Ctrl+s", "G#7": "Ctrl+d", "Ab7": "Ctrl+d", "A7": "Ctrl+f", "A#7": "Ctrl+g", "Bb7": "Ctrl+g", "B7": "Ctrl+h",
-            "C8": "Ctrl+j"
-        };
-    }
+    for (let t = 0; t < nTracks; t++) {
+      if (offset + 8 > view.byteLength) break;
+      if (readStr(4) !== "MTrk") {
+        // try recover
+        offset -= 3;
+        continue;
+      }
+      const trackLen = readU32();
+      const trackEnd = offset + trackLen;
+      let tick = 0;
+      let runningStatus = 0;
 
-    function roundToThree(num) {
-        return Math.round(num * 1000) / 1000;
-    }
-
-    // Group notes that start at the exact same time (within 1ms tolerance)
-    function groupByStartTime(events, tolerance = 0.001) {
-        if (events.length === 0) return [];
-        const groups = [];
-        let currentGroup = [events[0]];
-        let currentTime = events[0].time;
-
-        for (let i = 1; i < events.length; i++) {
-            if (Math.abs(events[i].time - currentTime) <= tolerance) {
-                currentGroup.push(events[i]);
-            } else {
-                groups.push({ time: currentTime, events: currentGroup });
-                currentGroup = [events[i]];
-                currentTime = events[i].time;
-            }
+      while (offset < trackEnd && offset < view.byteLength) {
+        const delta = readVarLen();
+        tick += delta;
+        let status = view.getUint8(offset);
+        if (status < 0x80) {
+          status = runningStatus;
+        } else {
+          offset++;
+          runningStatus = status;
         }
-        groups.push({ time: currentTime, events: currentGroup });
-        return groups;
+        const type = status & 0xf0;
+        const channel = status & 0x0f;
+
+        if (type === 0x90 || type === 0x80) {
+          const note = readU8();
+          const vel = readU8();
+          const isOn = type === 0x90 && vel > 0;
+          events.push({
+            tick,
+            type: isOn ? "on" : "off",
+            note,
+            velocity: vel,
+            channel,
+          });
+        } else if (type === 0xa0 || type === 0xb0 || type === 0xe0) {
+          offset += 2;
+        } else if (type === 0xc0 || type === 0xd0) {
+          offset += 1;
+        } else if (status === 0xff) {
+          const meta = readU8();
+          const len = readVarLen();
+          offset += len;
+        } else if (status === 0xf0 || status === 0xf7) {
+          const len = readVarLen();
+          offset += len;
+        } else {
+          // unknown – skip 1
+          break;
+        }
+      }
+      offset = trackEnd;
     }
 
-    let songscript = "";
-    let output = "";
+    events.sort((a, b) => a.tick - b.tick || (a.type === "on" ? -1 : 1));
+    return { events, ticksPerQuarter };
+  }
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-        try {
-            const midiData = new Uint8Array(event.target.result);
-            const midi = new Midi(midiData);
+  /**
+   * Convert parsed MIDI → Lua sheet string
+   * @param {ArrayBuffer} buffer
+   * @param {{ bpm?: number, shortNote?: boolean }} opts
+   */
+  function midiToLua(buffer, opts) {
+    opts = opts || {};
+    const bpm = opts.bpm || 120;
+    const useShort = opts.shortNote !== false; // default short notes (x)
 
-            if (document.getElementById("detectBpmCheckbox").checked) {
-                bpmInput = Math.round(midi.header.tempos[0]?.bpm || 120);
-            }
+    const { events, ticksPerQuarter } = parseMidi(buffer);
 
-            // Use ticks per second for accurate timing
-            const tempoBpm = midi.header.tempos[0]?.bpm || Number(bpmInput) || 120;
-            const multBy = tempoBpm / 60;
+    // Group note-ons by tick → chords
+    const byTick = new Map();
+    for (const ev of events) {
+      if (ev.type !== "on") continue;
+      if (!byTick.has(ev.tick)) byTick.set(ev.tick, []);
+      byTick.get(ev.tick).push(ev.note);
+    }
 
-            output += `-- Generated by MIDI2LUA (fixed note capture) --\n`;
-            output += `-- MIDI88: ${document.getElementById("midi88Checkbox").checked ? "ON" : "OFF"} --\n`;
-            output += `-- Short Notes: ${document.getElementById("shortNotesCheckbox").checked ? "OFF (use lengths)" : "ON"} --\n`;
-            output += `-- Note Velocity: ${document.getElementById("velocityCheckbox").checked ? "ON" : "OFF"} --\n`;
-            output += `-- Sustain Pedal: ${document.getElementById("sustainPedalCheckBox").checked ? "ON" : "OFF"} --\n`;
-            output += `-- Midi Spoofer: ${document.getElementById("midiSpoofCheckbox").checked ? "ON" : "OFF"} --\n`;
-            output += `\nbpm = ${bpmInput}\n\n`;
+    const ticks = Array.from(byTick.keys()).sort((a, b) => a - b);
+    if (ticks.length === 0) {
+      return "-- empty MIDI\nfinishedSong()\n";
+    }
 
-            if (document.getElementById("midiSpoofCheckbox").checked) {
-                output += `loadstring(game:HttpGet("https://raw.githubusercontent.com/Linh-1205/autopiano/refs/heads/main/midi_spoof_loader.lua", true))()\n\n`;
-            } else {
-                output += `loadstring(game:HttpGet("https://raw.githubusercontent.com/Linh-1205/autopiano/refs/heads/main/load.lua", true))()\n\n`;
-            }
+    const lines = [];
+    lines.push("-- AutoPiano sheet generated from MIDI");
+    lines.push("-- BPM hint: " + bpm);
+    lines.push("");
 
-            // Collect ALL notes from ALL tracks
-            let notesByTime = [];
-            let pedalEvents = [];
+    let prevTick = ticks[0];
 
-            midi.tracks.forEach(track => {
-                track.notes.forEach(note => {
-                    notesByTime.push({
-                        time: note.time,
-                        name: note.name,
-                        duration: note.duration,
-                        velocity: note.velocity,
-                        type: 'note'
-                    });
-                });
+    // optional lead-in rest if first note not at 0
+    if (prevTick > 0) {
+      const beats = prevTick / ticksPerQuarter;
+      if (beats > 0.01) {
+        lines.push(`rest(${roundBeats(beats)}, bpm)`);
+      }
+    }
 
-                if (document.getElementById("sustainPedalCheckBox").checked && track.controlChanges && track.controlChanges[64]) {
-                    track.controlChanges[64].forEach(cc => {
-                        pedalEvents.push({
-                            time: cc.time,
-                            value: cc.value,
-                            type: 'pedal'
-                        });
-                    });
-                }
-            });
+    for (let i = 0; i < ticks.length; i++) {
+      const tick = ticks[i];
+      const notes = byTick.get(tick);
+      // unique + sorted
+      const unique = [...new Set(notes)].sort((a, b) => a - b);
+      const keys = unique.map(pitchToKey).join("");
 
-            // Sort everything by start time
-            notesByTime.sort((a, b) => a.time - b.time || a.name.localeCompare(b.name));
-            pedalEvents.sort((a, b) => a.time - b.time);
-
-            // Merge into one timeline
-            let allEvents = [...notesByTime, ...pedalEvents];
-            allEvents.sort((a, b) => a.time - b.time);
-
-            // Group notes that start at the same moment
-            const noteGroups = groupByStartTime(notesByTime);
-
-            let lastEndTime = 0;
-            let lastVel = null;
-            let noteIndex = 0;
-            let pedalIndex = 0;
-
-            // Process by walking through time-ordered unique points
-            const uniqueTimes = [...new Set(allEvents.map(e => e.time))].sort((a, b) => a - b);
-
-            for (const t of uniqueTimes) {
-                let timeDelta = roundToThree((t - lastEndTime) * multBy);
-                if (timeDelta > 0.0005) {
-                    songscript += `rest(${timeDelta}, bpm)\n`;
-                }
-
-                // Pedals at this time
-                while (pedalIndex < pedalEvents.length && Math.abs(pedalEvents[pedalIndex].time - t) < 0.001) {
-                    const p = pedalEvents[pedalIndex];
-                    if (p.value > 0) {
-                        songscript += `pedalDown()\n`;
-                    } else {
-                        songscript += `pedalUp()\n`;
-                    }
-                    pedalIndex++;
-                }
-
-                // All notes that start at this exact time
-                const notesAtT = notesByTime.filter(n => Math.abs(n.time - t) < 0.001);
-                if (notesAtT.length > 0) {
-                    // Velocity (use first note's velocity if enabled)
-                    if (document.getElementById("velocityCheckbox").checked) {
-                        const vel = roundToThree(notesAtT[0].velocity) || 0.5;
-                        if (lastVel !== vel) {
-                            songscript += `adjustVelocity(${vel})\n`;
-                            lastVel = vel;
-                        }
-                    }
-
-                    // Emit EVERY note — no skipping duplicates
-                    for (const note of notesAtT) {
-                        const currentKey = noteMap[note.name] || note.name;
-                        let keypressDuration = 'x';
-
-                        if (document.getElementById("shortNotesCheckbox").checked) {
-                            keypressDuration = roundToThree(note.duration * multBy);
-                            if (keypressDuration < 0.05) keypressDuration = 0.05;
-                        }
-
-                        songscript += `keypress("${currentKey}", ${keypressDuration}, bpm)\n`;
-                    }
-                }
-
-                lastEndTime = t;
-            }
-
-            songscript += `\nfinishedSong()\n`;
-            outputText.value = output + songscript;
-
-            // Count stats
-            const totalNotes = notesByTime.length;
-            const totalLines = (songscript.match(/keypress/g) || []).length;
-            console.log(`Converted ${totalNotes} notes → ${totalLines} keypress calls`);
-        } catch (err) {
-            console.error(err);
-            outputText.value = "Error converting MIDI: " + err.message;
+      if (useShort) {
+        lines.push(`keypress("${escapeKeys(keys)}", x, bpm)`);
+      } else {
+        // estimate duration from next event or 0.5 beat
+        let durBeats = 0.5;
+        if (i + 1 < ticks.length) {
+          durBeats = Math.max(0.05, (ticks[i + 1] - tick) / ticksPerQuarter * 0.85);
         }
-    };
+        lines.push(`keypress("${escapeKeys(keys)}", ${roundBeats(durBeats)}, bpm)`);
+      }
 
-    reader.readAsArrayBuffer(fileInput.files[0]);
-});
+      // rest until next note-on group
+      if (i + 1 < ticks.length) {
+        const deltaTicks = ticks[i + 1] - tick;
+        const beats = deltaTicks / ticksPerQuarter;
+        if (beats > 0.01) {
+          lines.push(`rest(${roundBeats(beats)}, bpm)`);
+        }
+      }
+    }
 
-document.getElementById("copyButton").addEventListener("click", () => {
-    const outputText = document.getElementById("output");
-    outputText.select();
-    document.execCommand("copy");
-});
+    lines.push("");
+    lines.push("finishedSong()");
+    return lines.join("\n");
+  }
+
+  function roundBeats(b) {
+    // keep up to 3 decimals, strip trailing zeros
+    const r = Math.round(b * 1000) / 1000;
+    return String(r);
+  }
+
+  function escapeKeys(s) {
+    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  global.Midi61 = {
+    parseMidi,
+    midiToLua,
+    pitchToKey,
+    NOTE_TO_KEY,
+  };
+})(typeof window !== "undefined" ? window : globalThis);
