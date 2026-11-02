@@ -1,144 +1,695 @@
-<!doctype html>
-<html lang="vi">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AutoPiano MIDI to Sheet</title>
-<style>
-  :root {
-    --bg: #12121a; --panel: #1c1c28; --item: #262634; --text: #ebebf5; --muted: #9696ac;
-    --accent: #ffb6d0; --accent-text: #281820;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 20px; margin: 0 0 4px; color: var(--accent); }
-  p.sub { margin: 0 0 20px; color: var(--muted); }
-  .drop {
-    border: 1px dashed var(--accent); border-radius: 12px; padding: 28px; text-align: center;
-    background: var(--panel); cursor: pointer; transition: background .15s;
-  }
-  .drop.over { background: #2a2030; }
-  .drop strong { color: var(--accent); }
-  input[type=file] { display: none; }
-  .row { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
-  label.f { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
-  input[type=number] {
-    width: 110px; padding: 8px 10px; border-radius: 8px; border: 0; background: var(--panel);
-    color: var(--text); font: inherit;
-  }
-  label.chk { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
-  button {
-    padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
-    background: var(--item); color: var(--text);
-  }
-  button.primary { background: var(--accent); color: var(--accent-text); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  textarea {
-    width: 100%; height: 320px; resize: vertical; border: 0; border-radius: 10px; padding: 12px;
-    background: var(--panel); color: var(--text); font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
-  }
-  #info { color: var(--muted); margin: 8px 0 12px; min-height: 21px; }
-  #info b { color: var(--text); }
-  .err { color: #ff7a8a !important; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIDI2LUA</title>
+  <meta property="og:title" content="MIDI2LUA">
+  <meta property="og:description" content="Convert MIDI to Roblox auto-piano Lua scripts. Accurate note capture, velocity and sustain pedal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ivory: #fffafb;
+      --white: #ffffff;
+      --blush: #fdeef2;
+      --pink-100: #f9dde5;
+      --pink-200: #f4c6d3;
+      --pink-300: #eca9bd;
+      --rose: #c9708d;
+      --rose-deep: #a8506e;
+      --ink: #43303a;
+      --ink-soft: #8a7480;
+      --line: rgba(201, 112, 141, 0.28);
+      --serif: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--sans);
+      color: var(--ink);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 0%, var(--pink-100), transparent 70%),
+        radial-gradient(ellipse 60% 45% at 90% 100%, var(--pink-200), transparent 70%),
+        var(--ivory);
+      background-attachment: fixed;
+    }
+
+    .wrapper {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 56px 20px 72px;
+    }
+
+    /* Masthead */
+    .masthead {
+      text-align: center;
+      margin-bottom: 36px;
+      animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--rose);
+      font-weight: 500;
+    }
+    h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(2.8rem, 8vw, 4.2rem);
+      letter-spacing: 0.08em;
+      line-height: 1.05;
+      color: var(--ink);
+      margin: 10px 0 6px;
+    }
+    h1 em { font-style: italic; color: var(--rose); font-weight: 500; }
+    .subtitle {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1.15rem;
+      color: var(--ink-soft);
+    }
+
+    .ornament {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin: 18px auto 0;
+      color: var(--pink-300);
+      width: 220px;
+    }
+    .ornament::before, .ornament::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--pink-300));
+    }
+    .ornament::after { transform: scaleX(-1); }
+    .ornament span { font-size: 0.8rem; }
+
+    /* Framed card */
+    .card {
+      position: relative;
+      width: 100%;
+      max-width: 580px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 44px 44px 40px;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,0.9) inset,
+        0 30px 60px -30px rgba(201, 112, 141, 0.35),
+        0 8px 24px -12px rgba(201, 112, 141, 0.2);
+      animation: rise 0.9s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 1px solid var(--pink-200);
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .card > * { position: relative; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    label.lbl, .field > label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--rose-deep);
+      margin-bottom: 8px;
+    }
+
+    input[type="number"],
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 2px;
+      border: 1px solid var(--pink-200);
+      background: var(--ivory);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+    }
+    input[type="number"]:focus,
+    textarea:focus {
+      border-color: var(--rose);
+      background: var(--white);
+      box-shadow: 0 0 0 4px rgba(236, 169, 189, 0.25);
+    }
+    input[type="number"]:disabled { color: var(--ink-soft); background: var(--blush); cursor: not-allowed; }
+    input[type="file"] { cursor: pointer; padding: 9px; color: var(--ink-soft); font-size: 0.85rem; }
+    input[type="file"]::file-selector-button {
+      background: var(--blush);
+      color: var(--rose-deep);
+      border: 1px solid var(--pink-300);
+      border-radius: 2px;
+      padding: 6px 16px;
+      margin-right: 14px;
+      font-family: var(--serif);
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    input[type="file"]::file-selector-button:hover { background: var(--pink-100); }
+
+    .field { margin-bottom: 20px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Drop box */
+    .dropzone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 26px 16px;
+      text-align: center;
+      cursor: pointer;
+      border: 1px dashed var(--pink-300);
+      border-radius: 2px;
+      background: var(--ivory);
+      transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+      outline: none;
+    }
+    .dropzone:hover, .dropzone:focus-visible, .dropzone.drag {
+      border-color: var(--rose);
+      background: var(--blush);
+    }
+    .dropzone:focus-visible { box-shadow: 0 0 0 4px rgba(236, 169, 189, 0.25); }
+    .dropzone .drop-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--pink-300);
+      color: var(--rose);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 6px;
+      background: var(--white);
+    }
+    .dropzone .drop-title {
+      font-family: var(--serif);
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--rose-deep);
+      letter-spacing: 0.02em;
+    }
+    .dropzone .drop-sub {
+      font-size: 0.82rem;
+      color: var(--ink-soft);
+      word-break: break-all;
+    }
+    .dropzone.has-file { border-style: solid; }
+    .dropzone.has-file .drop-sub { color: var(--ink); font-weight: 500; }
+
+    /* Options */
+    .options {
+      display: flex;
+      flex-direction: column;
+      margin: 26px 0 28px;
+      border-top: 1px solid var(--pink-200);
+    }
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 4px;
+      border-bottom: 1px solid var(--pink-100);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.25s, padding-left 0.25s;
+    }
+    .opt:hover { background: var(--blush); padding-left: 12px; }
+    .opt input { display: none; }
+    .check {
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--pink-300);
+      border-radius: 2px;
+      background: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .opt input:checked + .check {
+      background: var(--rose);
+      border-color: var(--rose);
+    }
+    .opt input:checked + .check::after {
+      content: "";
+      width: 4px;
+      height: 8px;
+      border: solid #fff;
+      border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg) translate(-1px, -1px);
+    }
+    .opt span {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--ink);
+      flex: 1;
+      letter-spacing: 0.01em;
+    }
+    .info-tip {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--pink-300);
+      color: var(--rose);
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      transition: all 0.2s;
+    }
+    .info-tip:hover { background: var(--rose); color: #fff; border-color: var(--rose); }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 20px;
+      border-radius: 2px;
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #convertButton {
+      background: linear-gradient(135deg, var(--pink-300), var(--rose));
+      color: #fff;
+      border: 1px solid var(--rose);
+      box-shadow: 0 10px 24px -10px rgba(201, 112, 141, 0.7);
+    }
+    #convertButton:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 30px -10px rgba(201, 112, 141, 0.8);
+    }
+    #convertButton:active:not(:disabled) { transform: translateY(0); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--rose-deep);
+      border: 1px solid var(--pink-300);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--blush); border-color: var(--rose); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Status line */
+    .status {
+      min-height: 1.6em;
+      margin-top: 20px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--ink-soft);
+      line-height: 1.5;
+    }
+    .status b { font-style: normal; font-weight: 600; color: var(--rose-deep); }
+    .status.error { color: var(--rose-deep); }
+
+    textarea#output {
+      min-height: 180px;
+      resize: vertical;
+      margin-top: 14px;
+      font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+    textarea#output::placeholder { font-family: var(--serif); font-style: italic; font-size: 1rem; color: var(--ink-soft); }
+
+    /* Info card */
+    .info-card {
+      width: 100%;
+      max-width: 580px;
+      margin-top: 28px;
+      padding: 30px 40px;
+      text-align: center;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      animation: rise 0.9s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .info-card h2 {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 500;
+      font-size: 1.6rem;
+      color: var(--rose);
+      margin-bottom: 14px;
+    }
+    .info-card ul { list-style: none; text-align: left; }
+    .info-card li {
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+      line-height: 1.65;
+      padding: 6px 0 6px 22px;
+      position: relative;
+    }
+    .info-card li::before {
+      content: "❦";
+      position: absolute;
+      left: 0;
+      color: var(--pink-300);
+    }
+    .info-card li strong { color: var(--ink); font-weight: 600; }
+    .info-card code { font-size: 0.82rem; background: var(--blush); padding: 1px 5px; border-radius: 2px; color: var(--rose-deep); }
+    .info-card p { font-size: 0.85rem; color: var(--ink-soft); font-family: var(--serif); font-style: italic; font-size: 1.05rem; }
+
+    /* Popups */
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      background: var(--white);
+      border: 1px solid var(--pink-300);
+      border-radius: 4px;
+      padding: 32px 30px 26px;
+      max-width: 380px;
+      width: 90%;
+      z-index: 100;
+      visibility: hidden;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--ink);
+      box-shadow: 0 30px 70px -20px rgba(168, 80, 110, 0.45);
+      text-align: center;
+    }
+    .popup::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 1px solid var(--pink-100);
+      pointer-events: none;
+    }
+    .popup.show { visibility: visible; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .popup p {
+      margin-bottom: 20px;
+      line-height: 1.6;
+      font-family: var(--serif);
+      font-size: 1.15rem;
+      position: relative;
+    }
+    .popup button {
+      width: 100%;
+      background: var(--rose);
+      color: #fff;
+      border: 1px solid var(--rose);
+      font-size: 0.95rem;
+      padding: 11px;
+      position: relative;
+    }
+    .popup button:hover { background: var(--rose-deep); }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(67, 48, 58, 0.35);
+      backdrop-filter: blur(3px);
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
+    }
+    .overlay.show { opacity: 1; visibility: visible; }
+
+    footer {
+      margin-top: 36px;
+      color: var(--ink-soft);
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 0.95rem;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+
+    @media (max-width: 520px) {
+      .card { padding: 36px 24px 30px; }
+      .info-card { padding: 26px 16px; }
+      .row2 { grid-template-columns: 1fr; gap: 0; }
+    }
+  </style>
 </head>
 <body>
-<main>
-  <h1>AutoPiano - MIDI to Sheet</h1>
-  <p class="sub">Tải file MIDI lên, nhận script Lua keypress / rest / finishedSong cho AutoPiano (Virtual Piano 61 phím, C2-C7). Dòng đầu <code>--BPM:xxx</code> để Add Song tự đọc BPM, không cần nhập tay.</p>
+  <div class="overlay" id="overlay"></div>
 
-  <label class="drop" id="drop">
-    <input type="file" id="file" accept=".mid,.midi,audio/midi">
-    <div><strong>Chọn file MIDI</strong> hoặc kéo thả vào đây</div>
-    <div id="fname" style="color:var(--muted);margin-top:6px"></div>
-  </label>
+  <div class="wrapper">
+    <header class="masthead">
+      <div class="eyebrow">Roblox Auto-Piano</div>
+      <h1>MIDI<em>2</em>LUA</h1>
+      <p class="subtitle">Accurate MIDI → Roblox piano scripts. No missed notes.</p>
+      <div class="ornament"><span>❦</span></div>
+    </header>
 
-  <div class="row">
-    <label class="f">BPM<input type="number" id="bpm" min="20" max="400" value="120"></label>
-    <label class="f">Transpose (nửa cung)<input type="number" id="transpose" min="-48" max="48" value="0"></label>
-    <label class="chk" style="align-self:flex-end"><input type="checkbox" id="fold" checked> Gập nốt ngoài dải vào C2-C7</label>
-    <label class="chk" style="align-self:flex-end"><input type="checkbox" id="hold"> Giữ nốt theo độ dài</label>
+    <div class="card">
+      <div class="row2">
+        <div class="field">
+          <label for="bpmInput">BPM</label>
+          <input type="number" id="bpmInput" placeholder="120" min="1" max="400" value="120" disabled />
+        </div>
+        <div class="field">
+          <label for="transposeInput">Transpose (semitones)</label>
+          <input type="number" id="transposeInput" min="-48" max="48" value="0" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="midiFile">MIDI file</label>
+        <div class="dropzone" id="fileField" role="button" tabindex="0" aria-label="Chọn tệp MIDI từ máy">
+          <div class="drop-icon">♪</div>
+          <div class="drop-title">Chọn tệp từ máy</div>
+          <div class="drop-sub" id="dropSub">hoặc kéo thả file MIDI vào đây (.mid, .midi)</div>
+        </div>
+        <input type="file" id="midiFile" accept=".mid,.midi,audio/midi" hidden />
+      </div>
+
+      <div class="options">
+        <label class="opt">
+          <input type="checkbox" id="checkAllCheckbox" />
+          <div class="check"></div>
+          <span>Check / uncheck all</span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="detectBpmCheckbox" checked />
+          <div class="check"></div>
+          <span>Detect BPM from file</span>
+          <div class="info-tip" data-popup="popup1">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="foldCheckbox" checked />
+          <div class="check"></div>
+          <span>Fold notes into C2–C7</span>
+          <div class="info-tip" data-popup="popup2">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="shortNotesCheckbox" />
+          <div class="check"></div>
+          <span>Use MIDI note lengths</span>
+          <div class="info-tip" data-popup="popup3">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="velocityCheckbox" />
+          <div class="check"></div>
+          <span>Use note velocity</span>
+          <div class="info-tip" data-popup="popup4">?</div>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="sustainPedalCheckBox" />
+          <div class="check"></div>
+          <span>Use sustain pedal</span>
+          <div class="info-tip" data-popup="popup5">?</div>
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button id="convertButton" disabled>Convert</button>
+        <button id="copyButton" class="btn-secondary" disabled>Copy</button>
+        <button id="downloadButton" class="btn-secondary" disabled>Download</button>
+      </div>
+
+      <div class="status" id="status">Choose a MIDI file to begin.</div>
+      <textarea id="output" readonly spellcheck="false" placeholder="Output Lua script will appear here..."></textarea>
+    </div>
+
+    <div class="info-card">
+      <h2>What's new</h2>
+      <ul>
+        <li><strong>No missed notes</strong> — chords &amp; overlapping notes are fully captured.</li>
+        <li><strong>Velocity &amp; sustain pedal</strong> — MIDI velocity becomes <code>adjustVelocity()</code> (Alt + key), CC64 becomes <code>pedalDown()</code> / <code>pedalUp()</code> (Space).</li>
+        <li>The first line <code>--BPM:xxx</code> is read by <strong>Add Song</strong>, so the song plays at the right tempo with no manual input.</li>
+        <li>Player has a <strong>seek bar</strong>, ⏪ ⏩ ±5s, pause/stop, and live BPM controls.</li>
+        <li>Custom songs can be placed in <strong>several categories</strong> at once, or in new ones.</li>
+      </ul>
+      <p style="margin-top:16px">Paste the generated script into Add Song in the AutoPiano executor. Enjoy.</p>
+    </div>
+
+    <footer>MIDI2LUA · improved note engine</footer>
   </div>
 
-  <div class="row">
-    <button class="primary" id="convert" disabled>Convert</button>
-    <button id="copy" disabled>Copy</button>
-    <button id="download" disabled>Download .txt</button>
-  </div>
+  <!-- Popups -->
+  <div class="popup" id="popup1"><p>Reads the tempo from the MIDI file instead of using the BPM box. Turn it off to type your own BPM. Timing stays exact either way; BPM only sets the song's base speed in the player.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup2"><p>The game piano has 61 keys (C2–C7). When on, notes outside that range are moved up or down by whole octaves. When off, they are dropped.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup3"><p>When enabled, uses actual note durations from the MIDI. When off, notes are short taps (better for many Roblox pianos).</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup4"><p>Translates MIDI velocity into Alt+key dynamics, only inserted when the level actually changes. Works only if the game piano supports velocity.</p><button onclick="closePopup()">Got it</button></div>
+  <div class="popup" id="popup5"><p>Converts sustain pedal (CC64) events into Space key holds. A pedal still held at the end is released automatically.</p><button onclick="closePopup()">Got it</button></div>
 
-  <div id="info"></div>
-  <textarea id="out" spellcheck="false" placeholder="Sheet sẽ hiện ở đây..."></textarea>
-</main>
+  <script src="midi61.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const OPTION_BOXES = ["detectBpmCheckbox", "foldCheckbox", "shortNotesCheckbox", "velocityCheckbox", "sustainPedalCheckBox"];
+    let midi = null;
+    let fileName = "song";
 
-<script src="midi61.js"></script>
-<script>
-  const $ = (id) => document.getElementById(id);
-  let midi = null, fileName = "song";
-
-  function setInfo(html, isErr) {
-    $("info").innerHTML = html;
-    $("info").classList.toggle("err", !!isErr);
-  }
-
-  async function loadFile(f) {
-    if (!f) return;
-    try {
-      midi = Midi61.parseMidi(await f.arrayBuffer());
-      fileName = f.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "") || "song";
-      $("fname").textContent = f.name;
-      $("bpm").value = midi.firstBpm || 120;
-      $("convert").disabled = false;
-      setInfo("Đọc được <b>" + midi.notes.length + "</b> nốt, dài <b>" + midi.duration.toFixed(1) + "s</b>, tempo gốc <b>" + midi.firstBpm + "</b> BPM.");
-      convert();
-    } catch (e) {
-      midi = null;
-      $("convert").disabled = true;
-      setInfo("Không đọc được file: " + e.message, true);
+    function setStatus(html, isError) {
+      $("status").innerHTML = html;
+      $("status").classList.toggle("error", !!isError);
     }
-  }
 
-  function convert() {
-    if (!midi) return;
-    const r = Midi61.midiToSheet(midi, {
-      bpm: $("bpm").value,
-      transpose: $("transpose").value,
-      fold: $("fold").checked,
-      hold: $("hold").checked,
+    function syncBpmField() {
+      const detect = $("detectBpmCheckbox").checked;
+      $("bpmInput").disabled = detect;
+      if (detect && midi) $("bpmInput").value = midi.firstBpm || 120;
+    }
+
+    function convert() {
+      if (!midi) return;
+      syncBpmField();
+      try {
+        const r = Midi61.midiToSheet(midi, {
+          bpm: $("bpmInput").value,
+          transpose: $("transposeInput").value,
+          fold: $("foldCheckbox").checked,
+          hold: $("shortNotesCheckbox").checked,
+          velocity: $("velocityCheckbox").checked,
+          pedal: $("sustainPedalCheckBox").checked,
+        });
+        const st = r.stats;
+        $("output").value = r.sheet;
+        $("copyButton").disabled = $("downloadButton").disabled = false;
+        const parts = [
+          "<b>" + st.groups + "</b> note lines from <b>" + st.notes + "</b> notes",
+          "<b>" + r.bpm + "</b> BPM",
+          "<b>" + st.seconds.toFixed(1) + "s</b>",
+        ];
+        if ($("velocityCheckbox").checked) parts.push("<b>" + st.velocityEvents + "</b> velocity changes");
+        if ($("sustainPedalCheckBox").checked) parts.push("<b>" + st.pedalEvents + "</b> pedal events");
+        if (st.folded) parts.push("<b>" + st.folded + "</b> folded");
+        if (st.dropped) parts.push("<b>" + st.dropped + "</b> dropped (out of range)");
+        setStatus(parts.join(" · "));
+      } catch (e) {
+        setStatus("Conversion failed: " + e.message, true);
+      }
+    }
+
+    async function loadFile(f) {
+      if (!f) return;
+      try {
+        midi = Midi61.parseMidi(await f.arrayBuffer());
+        fileName = f.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "") || "song";
+        $("dropSub").textContent = f.name;
+        $("fileField").classList.add("has-file");
+        $("convertButton").disabled = false;
+        syncBpmField();
+        convert();
+      } catch (e) {
+        midi = null;
+        $("dropSub").textContent = "hoặc kéo thả file MIDI vào đây (.mid, .midi)";
+        $("fileField").classList.remove("has-file");
+        $("convertButton").disabled = true;
+        $("copyButton").disabled = $("downloadButton").disabled = true;
+        $("output").value = "";
+        setStatus("Could not read this file: " + e.message, true);
+      }
+    }
+
+    $("midiFile").addEventListener("change", (e) => loadFile(e.target.files[0]));
+
+    // click / keyboard opens the file picker; drag & drop onto the drop box
+    const field = $("fileField");
+    field.addEventListener("click", () => $("midiFile").click());
+    field.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("midiFile").click(); }
     });
-    $("out").value = r.sheet;
-    $("copy").disabled = $("download").disabled = false;
-    setInfo("<b>" + r.stats.groups + "</b> dòng keypress từ <b>" + r.stats.notes + "</b> nốt"
-      + " | BPM <b>" + r.bpm + "</b>"
-      + " | gập quãng tám: <b>" + r.stats.folded + "</b>"
-      + " | bỏ (ngoài dải): <b>" + r.stats.dropped + "</b>");
-  }
+    ["dragenter", "dragover"].forEach((ev) => field.addEventListener(ev, (e) => { e.preventDefault(); field.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => field.addEventListener(ev, (e) => { e.preventDefault(); field.classList.remove("drag"); }));
+    field.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
 
-  $("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
-  const drop = $("drop");
-  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+    // Check-all
+    $("checkAllCheckbox").addEventListener("change", function () {
+      OPTION_BOXES.forEach((id) => { $(id).checked = this.checked; });
+      convert();
+    });
+    OPTION_BOXES.forEach((id) => $(id).addEventListener("change", () => {
+      $("checkAllCheckbox").checked = OPTION_BOXES.every((b) => $(b).checked);
+      convert();
+    }));
+    ["bpmInput", "transposeInput"].forEach((id) => $(id).addEventListener("change", convert));
+    $("convertButton").addEventListener("click", convert);
 
-  $("convert").addEventListener("click", convert);
-  ["bpm", "transpose", "fold", "hold"].forEach((id) => $(id).addEventListener("change", convert));
+    $("copyButton").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText($("output").value); }
+      catch (e) { $("output").select(); document.execCommand("copy"); }
+      $("copyButton").textContent = "Copied";
+      setTimeout(() => ($("copyButton").textContent = "Copy"), 1200);
+    });
 
-  $("copy").addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText($("out").value); }
-    catch (e) { $("out").select(); document.execCommand("copy"); }
-    $("copy").textContent = "Copied";
-    setTimeout(() => ($("copy").textContent = "Copy"), 1200);
-  });
+    $("downloadButton").addEventListener("click", () => {
+      const url = URL.createObjectURL(new Blob([$("output").value], { type: "text/plain" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName + ".txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
 
-  $("download").addEventListener("click", () => {
-    const url = URL.createObjectURL(new Blob([$("out").value], { type: "text/plain" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = fileName + ".txt"; a.click();
-    URL.revokeObjectURL(url);
-  });
-</script>
+    // Tooltips
+    document.querySelectorAll(".info-tip").forEach((tip) => {
+      tip.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        $(tip.dataset.popup).classList.add("show");
+        $("overlay").classList.add("show");
+      });
+    });
+    function closePopup() {
+      document.querySelectorAll(".popup").forEach((p) => p.classList.remove("show"));
+      $("overlay").classList.remove("show");
+    }
+    $("overlay").addEventListener("click", closePopup);
+  </script>
 </body>
 </html>

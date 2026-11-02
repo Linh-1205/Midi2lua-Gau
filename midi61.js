@@ -3,7 +3,10 @@
  * Không phụ thuộc thư viện ngoài. Dùng được cả trong trình duyệt lẫn Node.
  *
  *   const midi  = Midi61.parseMidi(arrayBuffer);
- *   const out   = Midi61.midiToSheet(midi, { bpm: 120, transpose: 0, fold: true, hold: false });
+ *   const out   = Midi61.midiToSheet(midi, { bpm: 120, transpose: 0, fold: true, hold: false,
+ *                                           velocity: false, pedal: false });
+ *   velocity: true -> chèn adjustVelocity(0..1) (MIDI velocity / 127) trước cụm nốt khi mức lực đổi
+ *   pedal:    true -> chèn pedalDown()/pedalUp() từ sustain pedal (CC64)
  *   out.sheet   -> dòng đầu "--BPM:xxx" (Add Song tự đọc), rồi keypress(...) / rest(...) / finishedSong()
  */
 (function (root) {
@@ -33,6 +36,16 @@
       else ch = ch.toUpperCase();
     }
     return ch;
+  }
+
+  // Mức lực -> phím Alt. PHẢI giống engine.lua để chỉ chèn adjustVelocity khi mức thực sự đổi.
+  const VELOCITY_MAP = "58qrupdhl";
+  function velocityKey(v) {
+    v = Math.min(1, Math.max(0, Number(v)));
+    if (v < 0.27) return "2";
+    if (v >= 0.88) return "c";
+    const index = Math.floor(((v - 0.27) / 0.61) * (VELOCITY_MAP.length - 2)) + 2;
+    return VELOCITY_MAP[index - 1];
   }
 
   // Đưa nốt về trong dải 61 phím bằng cách dịch cả quãng tám
@@ -67,6 +80,7 @@
 
     const notes = []; // { tick, endTick, pitch, vel }
     const tempos = []; // { tick, usPerBeat }
+    const pedalEv = []; // { tick, ch, down } - sustain pedal (CC64)
 
     for (let t = 0; t < ntrks; t++) {
       if (p >= data.length) break;
@@ -103,6 +117,8 @@
           } else if (kind === 0x80 || (kind === 0x90 && b === 0)) {
             const list = active[key];
             if (list && list.length) list.shift().endTick = tick;
+          } else if (kind === 0xb0 && a === 64 && ch !== 9) {
+            pedalEv.push({ tick, ch, down: b >= 64 });
           }
         }
       }
@@ -133,9 +149,23 @@
     }
     notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
 
+    // pedal: gộp các kênh, chỉ giữ lúc trạng thái chung (có kênh nào đang đạp) đổi
+    pedalEv.sort((a, b) => a.tick - b.tick);
+    const chDown = {};
+    let anyDown = false;
+    const pedals = [];
+    for (const e of pedalEv) {
+      chDown[e.ch] = e.down;
+      const now = Object.keys(chDown).some((k) => chDown[k]);
+      if (now !== anyDown) {
+        anyDown = now;
+        pedals.push({ tick: e.tick, start: tickToSec(e.tick), down: now });
+      }
+    }
+
     const firstBpm = Math.round(60e6 / tempos[0].usPerBeat);
     const duration = notes.reduce((m, n) => Math.max(m, n.end), 0);
-    return { format, division, notes, tempos, firstBpm, duration };
+    return { format, division, notes, pedals, tempos, firstBpm, duration };
   }
 
   // ---------------------------------------------------------------- sheet
@@ -146,6 +176,8 @@
     const transpose = Number(opts.transpose) || 0;
     const fold = opts.fold !== false;
     const hold = !!opts.hold;
+    const useVel = !!opts.velocity;
+    const usePedal = !!opts.pedal;
     const EPS = 0.001; // nốt cách nhau <1ms coi là cùng timestamp (chord)
     const fmt = (v) => String(Math.round(v * 10000) / 10000);
 
@@ -162,26 +194,54 @@
       const beatLen = ((n.end - n.start) * bpm) / 60;
       if (last && Math.abs(n.start - last.start) < EPS) {
         if (!last.keys.includes(key)) { last.keys.push(key); last.beats = Math.max(last.beats, beatLen); }
+        last.vel = Math.max(last.vel, n.vel);
       } else {
-        groups.push({ start: n.start, keys: [key], beats: beatLen });
+        groups.push({ start: n.start, keys: [key], beats: beatLen, vel: n.vel });
       }
     }
+
+    // Gộp nốt + pedal thành một timeline. Cùng thời điểm: pedal trước, rồi mới tới nốt.
+    const items = groups.map((g) => ({ start: g.start, order: 1, g }));
+    if (usePedal) for (const p of midi.pedals || []) items.push({ start: p.start, order: 0, pedal: p.down });
+    items.sort((a, b) => a.start - b.start || a.order - b.order);
 
     // Dòng đầu: Add Song đọc BPM từ đây, người dùng không cần nhập tay
     const lines = ["--BPM:" + bpm];
     let prevBeat = 0; // vị trí đã làm tròn của dòng trước
-    for (const g of groups) {
-      const absBeat = Math.round(((g.start * bpm) / 60) * 10000) / 10000;
+    let pedalState = false, lastVelKey = null, pedalEvents = 0, velocityEvents = 0;
+    for (const it of items) {
+      const absBeat = Math.round(((it.start * bpm) / 60) * 10000) / 10000;
       const gap = Math.round((absBeat - prevBeat) * 10000) / 10000;
       if (gap > 0) lines.push("rest(" + fmt(gap) + ", bpm)");
       prevBeat = absBeat;
+
+      if (it.pedal !== undefined) {
+        if (it.pedal !== pedalState) {
+          pedalState = it.pedal;
+          pedalEvents++;
+          lines.push(it.pedal ? "pedalDown()" : "pedalUp()");
+        }
+        continue;
+      }
+
+      const g = it.g;
+      if (useVel) {
+        const v = Math.round(Math.min(1, Math.max(0, g.vel / 127)) * 100) / 100;
+        const vk = velocityKey(v);
+        if (vk !== lastVelKey) {
+          lastVelKey = vk;
+          velocityEvents++;
+          lines.push("adjustVelocity(" + fmt(v) + ")");
+        }
+      }
       const keys = g.keys.join("").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
       const len = hold ? fmt(Math.max(g.beats, 0.05)) : "x";
       lines.push('keypress("' + keys + '", ' + len + ", bpm)");
     }
-    // chờ hết nốt cuối rồi mới finish
+    // chờ hết nốt cuối rồi mới finish; pedal còn đạp thì nhả để không kẹt
     const endBeat = Math.round(((midi.duration * bpm) / 60) * 10000) / 10000;
     if (endBeat > prevBeat) lines.push("rest(" + fmt(endBeat - prevBeat) + ", bpm)");
+    if (pedalState) lines.push("pedalUp()");
     lines.push("finishedSong()");
 
     return {
@@ -190,6 +250,8 @@
       stats: {
         notes: midi.notes.length,
         groups: groups.length,
+        pedalEvents,
+        velocityEvents,
         dropped,
         folded,
         seconds: midi.duration,
@@ -197,7 +259,7 @@
     };
   }
 
-  const api = { parseMidi, midiToSheet, midiToKey };
+  const api = { parseMidi, midiToSheet, midiToKey, velocityKey };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Midi61 = api;
 })(typeof window !== "undefined" ? window : this);
