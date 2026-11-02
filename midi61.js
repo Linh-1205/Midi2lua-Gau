@@ -4,7 +4,7 @@
  *
  *   const midi  = Midi61.parseMidi(arrayBuffer);
  *   const out   = Midi61.midiToSheet(midi, { bpm: 120, transpose: 0, fold: true, hold: false });
- *   out.sheet   -> chuỗi Lua: keypress(...) / rest(...) / finishedSong()
+ *   out.sheet   -> dòng đầu "--BPM:xxx" (Add Song tự đọc), rồi keypress(...) / rest(...) / finishedSong()
  */
 (function (root) {
   "use strict";
@@ -141,7 +141,8 @@
   // ---------------------------------------------------------------- sheet
   function midiToSheet(midi, opts) {
     opts = opts || {};
-    const bpm = Number(opts.bpm) > 0 ? Number(opts.bpm) : midi.firstBpm || 120;
+    // BPM nguyên: dòng --BPM ở đầu sheet và mọi rest() dùng cùng một giá trị
+    const bpm = Math.max(1, Math.round(Number(opts.bpm) > 0 ? Number(opts.bpm) : midi.firstBpm || 120));
     const transpose = Number(opts.transpose) || 0;
     const fold = opts.fold !== false;
     const hold = !!opts.hold;
@@ -166,7 +167,8 @@
       }
     }
 
-    const lines = [];
+    // Dòng đầu: Add Song đọc BPM từ đây, người dùng không cần nhập tay
+    const lines = ["--BPM:" + bpm];
     let prevBeat = 0; // vị trí đã làm tròn của dòng trước
     for (const g of groups) {
       const absBeat = Math.round(((g.start * bpm) / 60) * 10000) / 10000;
